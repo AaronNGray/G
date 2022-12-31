@@ -31,16 +31,16 @@ Uses Two "new" alogorithms :-
 
 A 'YACC' style Parser Generator. Takes a .pg file and generates a parser library.
 
- [ ] LL(1)
- [ ] SLR
- [ ] LR(0)
- [ ] LR(1)
- [x] LALR(1)
- [ ] LAR(m)
- [ ] RNGLR
- [ ] SPPF
- [ ] Pakrat
- [ ] Recursive Descent with Backtracking and Memorization
+ - [ ] LL(1)
+ - [ ] SLR
+ - [ ] LR(0)
+ - [ ] LR(1)
+ - [x] LALR(1)
+ - [ ] LAR(m)
+ - [ ] RNGLR
+ - [ ] SPPF
+ - [ ] Pakrat
+ - [ ] Recursive Descent with Backtracking and Memorization
 
 ## AG - AST Generator ##
 

@@ -56,11 +56,11 @@ The Generator Generator takes a Grammar and generates methods that convert an AS
 
 ## TG - Template Generator ##
 
-Template generator generates AST's from augmented grammars and a template library for generating instance AST's
+Template generator generates AST's from a grammar augmented with templating syntax generating methods that generate instance AST's. This allows clean syntatic templating.
 
 ## G - Generate ##
 
-G ties all the libraries together and does what all the tools do using *.g format files. And will also allow higherlevel modular grammars to pre defined.
+G will tie together all the libraries together and does what all the tools do using *.g format files. G will combine lexical specifications and grammar specifications into one specificiation. And will also allow higherlevel modular grammars to be defined.
 # Instillation
 
 # Build

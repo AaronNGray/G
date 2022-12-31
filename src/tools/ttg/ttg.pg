@@ -1,0 +1,187 @@
+//
+//	g/src/tools/ttg/ttg.pg
+//
+//  Property and Copyright (c) 2022 Aaron Nathaniel Gray
+//
+
+grammar TTG "LR(1)" {
+
+header {
+	#include <io.h>
+	#include <iostream>
+	#include <cassert>
+	#include "g/Logger.h"
+	#include "g/TextualTemplateGenerator/TextualTemplate.h"
+
+	using namespace G::TextualTemplateGenerator;
+
+    union ValueType {
+		TextualTemplate::Module *Module;
+		TextualTemplate::Templates *Templates;
+		TextualTemplate::Template *Template;
+		TextualTemplate::QualifiedName* QualifiedName;
+		TextualTemplate::Type* Type;
+		TextualTemplate::Arguments* Arguments;
+		TextualTemplate::Argument* Argument;
+		TextualTemplate::Name* Name;
+		TextualTemplate::Block* Block;
+    	TextualTemplate::Identifier *Identifier;
+    	TextualTemplate::StringLiteral *StringLiteral;
+    	TextualTemplate::Code *Code;
+    };
+
+    extern ValueType currentValue;
+	extern Logger *logger;
+    using namespace Runtime;
+};
+
+code {
+	#include "ttg.lg.h"
+	ValueType currentValue;
+};
+code {
+	void ttgParser::reportError(State state, Input input) {
+		std::string report = std::string("Found ") + Terminals[input] + " Expecting ";
+
+		Pair<Action>* pair = ShiftReduce_states[state - 1]->pair;
+		if (pair) {
+			for (size_t pairs = ShiftReduce_states[state - 1]->pairs; pairs > 0; --pairs) {
+                report += std::string(Terminals[pair->input]) + ((pairs > 1) ? ", " : "");
+				++pair;
+			}
+		}
+		else
+            report += std::string("<nothing>");
+        report += std::string(" in state ") + std::to_string(state) + ".\n";
+
+		logger->LogError(new SyntaxErrorObject(report, lexer->getLineNumber(), lexer->getCharacter()));
+	}
+};
+
+roottype "TextualTemplate";
+basetype union "ValueType";
+
+nonterm TextualTemplateGrammar : Module;
+nonterm Templates : Templates;
+nonterm Template : Template;
+nonterm TemplateClass : Template;
+nonterm TemplateFunction : Template;
+nonterm Arguments : Arguments;
+nonterm Argument : Argument;
+nonterm QualifiedName : QualifiedName;
+nonterm Type : QualifiedName;
+nonterm Block : Block;
+nonterm Parameter : Code;
+nonterm SubBlocks : Block;
+nonterm SubBlock : Code;
+
+term KEYWORD_MODULE                     "module";
+
+term KEYWORD_CODE						"code";
+term KEYWORD_HEADER						"header";
+
+term KEYWORD_TEMPLATE                   "template";
+term KEYWORD_CLASS                      "class";
+term KEYWORD_FUNCTION                   "function";
+term KEYWORD_METHOD                     "method";
+
+term OPERATOR_OPEN_CURLY_BRACE	        "{";
+term OPERATOR_CLOSE_CURLY_BRACE	        "}";
+term OPERATOR_OPEN_DOUBLE_CURLY_BRACE	"{{";
+term OPERATOR_CLOSE_DOUBLE_CURLY_BRACE	"}}";
+
+term OPERATOR_OPEN_PARENTHSIS	        "(";
+term OPERATOR_CLOSE_PARENTHSIS	        ")";
+term OPERATOR_OPEN_DOUBLE_PARENTHSIS	"((";
+term OPERATOR_CLOSE_DOUBLE_PARENTHSIS	"))";
+
+term OPERATOR_SEMICOLON			        ";";
+term OPERATOR_COLON				        ":";
+term OPERATOR_DOUBLE_COLON		        "::";
+term OPERATOR_COMMA				        ",";
+
+term IDENTIFIER : Identifier;
+term STRING_LITERAL : StringLiteral;
+term TOKEN_PARAMETER : Code;
+term TOKEN_CODE : Code;
+term TOKEN_ACTIONCODE : Code;
+term NEWLINE;
+
+start TextualTemplateGrammar;
+
+production TextualTemplateGrammar =
+    "module" name:IDENTIFIER "{" templates:Templates "}" { root->module = root->newModule($name$, $templates$); }
+;
+
+production Templates =
+    Templates Template { $$ = $1; $1->append($2); }
+  | Template { $$ = root->newTemplates(); $$->append($1); }
+;
+
+production Template =
+    TemplateClass { $$ = $1; }
+  | TemplateFunction { $$ = $1; }
+;
+
+production TemplateClass =
+    "template" "class" name:Type "(" ")" "{" block:Block "}" ";" {
+		$$ = root->newClassTemplate($name$, $block$);
+	}
+  | "template" "class" name:Type "(" arguments:Arguments ")" "{" block:Block "}" ";" {
+		$$ = root->newClassTemplate($name$, $arguments$, $block$);
+    }
+;
+
+production TemplateFunction =
+    "template" "function" class:Type "::" name:IDENTIFIER "(" ")" "{" block:Block "}" ";" {
+		$class$->append($name$);
+		$$ = root->newFunctionTemplate($class$, $block$);
+	}
+  | "template" "function" class:Type "::" name:IDENTIFIER "(" arguments:Arguments ")" "{" block:Block "}" ";" {
+		$class$->append($name$);
+		$$ = root->newFunctionTemplate($class$, $arguments$, $block$);
+    }
+;
+
+production Arguments =
+    arguments:Arguments "," argument:Argument {
+		$arguments$->append($argument$);
+	}
+  | argument:Argument {
+		$$ = root->newArguments(); $$->append($argument$);
+	}
+;
+
+production Argument =
+    name:IDENTIFIER ":" type:Type {
+		$$ = root->newArgument($name$, $type$);
+	}
+;
+
+production Type =
+    type:Type "::" identifier:IDENTIFIER {
+		$$ = $1; $type$->append($identifier$);
+	}
+  | identifier:IDENTIFIER {
+		$$ = root->newType(); $$->append($identifier$);
+	}
+;
+
+production Block =
+    subBlocks:SubBlocks { $$ = $subBlocks$; }
+;
+
+production SubBlocks =
+	subBlocks:SubBlocks subBlock:SubBlock { $subBlocks$->append($subBlock$); $$ = $subBlocks$; }
+  | subBlock:SubBlock { $$ = root->newBlock(); $$->append($subBlock$); }
+;
+
+production SubBlock =
+	block:TOKEN_CODE { $$ = root->newCodeBlock($block$); }
+  | block:TOKEN_ACTIONCODE { $$ = root->newActionCode($block$); }
+  | parameter:TOKEN_PARAMETER { $$ = root->newParameter($parameter$); }
+;
+
+}
+
+// End g/src/tools/ttg/ttg.pg

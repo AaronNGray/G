@@ -1,0 +1,200 @@
+module ParserGenerator {
+    template function ParserGenerator::OutputHXX () {
+        {{ File<std::ostream> output(base_filepath + ".pg.h"); }}
+        #pragma once
+        {{ auto guard = generateGuardString(base_filepath + ".pg.h"); }}
+        #ifndef (( guard ))
+        #define (( guard ))
+
+        #include "runtime/lexer/Lexer.h"
+        #include "runtime/parser/((baseParserName)).h"
+        #include "runtime/Stack.h"
+        #include "runtime/Pairs.h"
+
+        ((header))
+
+        class ((className)) : public ((baseParserClassName)) <short, ((valueType))> {
+        public:
+            ((className)) (Lexer<((valueType))>* lexer, ((valueType))& currentValue, ((rootASTTypeName))* root, bool debug = false) : root(root), ((baseParserClassName ))(lexer, currentValue, debug) {}
+
+            typedef short State;" << std::endl;
+            typedef ((valueType)) Value;
+
+            ((rootASTTypeName))* root;
+
+            virtual size_t getStates() {
+                return lr1->states.size();
+            }
+
+            virtual Action nextState(State state, Input input) {
+                if (rowCompression) {
+                    auto cell = ShiftReduce_states[state - 1];
+                    return cell ? cell->lookup(input) : Action(Action::Function::Error);
+                }
+            	else
+            	    return ShiftReduce_states[state - 1].lookup(input);
+        	}
+
+        	virtual State nextGoto(State state, NonTerminal lhs) {
+            	if (rowCompression) {
+            	    auto cell = Goto_states[state - 1];
+            	    return cell ? cell->lookup(lhs) : 0;
+            	} else
+            	    return Goto_states[state - 1].lookup(lhs);
+        	}
+
+        	virtual int getAcceptAction(size_t rule) {
+        	    return ActionMap[rule];
+        	}
+
+        	virtual void dispatch(int action) {
+        	    (this->*Actions[action])();
+        	}
+
+        	virtual size_t getNumberOfRHSSymbols(unsigned rule) {
+        	    return rhsSymbols[rule];
+        	}
+
+        	virtual NonTerminal getLHSSymbolIndex(unsigned rule) {
+        	    return rule2lhs[rule];
+        	}
+
+        	virtual size_t getNumberOfTerminals() {
+        	    return (( grammar->getNumberOfTerminalSymbols() ));
+        	}
+
+        	virtual const char* getTerminalName(size_t index) {
+        	    return Terminals[index];
+        	}
+
+        	virtual const char* getNonTerminalName(size_t index) {
+        	    return NonTerminals[index - 1];
+        	}
+
+        	virtual void reportError(State state, Input input);
+
+        	static const char* Terminals[ (( grammar->terminals.size() )) ];
+        	static const char* NonTerminals[ (( grammar->nonTerminals.size() )) ];
+
+        	enum Terminal {
+        	    {{
+        	        for (size_t terminal = 0, terminals = grammar->terminals.size(); terminal < terminals; ++terminal) {
+                    if (terminal < terminals - 1)
+                }}
+                    ((grammar->terminals[terminal]->getName())),
+                {{
+                    else
+                }}
+                    ((grammar->terminals[terminal]->getName()))
+                }}
+        	};
+
+        	lr1->OutputHXX(output, className);
+
+        	// static size_t rule[((lr1->states.size()))];
+        	static size_t rhsSymbols[((grammar->rules.size()))];
+        	static NonTerminal rule2lhs[((grammar->rules.size()))];
+
+        	static int ActionMap[((grammar->rules.size()))];
+
+            {{
+                if (actions->size())
+                    actions->OutputActionsHXX(output, className, returnType);
+            }}
+        };
+
+        #endif // ((guard))
+    }
+
+    template function ParserGenerator::OutputCXX () {
+        {{ File<std::ostream> output(base_filepath + ".pg.cpp"); }}
+
+        #include "((base_filepath)).pg.h"
+
+        ((code))
+
+        lr1->OutputCXX(output, className);
+
+        const char* "((className))"::Terminals[((grammar->terminals.size()))] = {
+        {{
+            for (size_t terminal = 0, terminals = grammar->terminals.size(); terminal < terminals; ++terminal) {
+        }}
+                    "((grammar->terminals[terminal]->getName()))"
+        {{
+                if (terminal < terminals - 1)
+        }}
+                ,
+        {{
+            }
+        }}
+        };
+
+        const char* ((className))::NonTerminals[((grammar->nonTerminals.size()))] = {
+        {{
+            for (size_t nonterminal = 0, nonterminals = grammar->nonTerminals.size(); nonterminal < nonterminals; ++nonterminal) {
+        }}
+                "((grammar->nonTerminals[nonterminal]->getName()))",
+        {{
+                if (nonterminal < nonterminals - 1)
+        }}
+                ,
+        {{
+            }
+        }}
+        };
+
+        size_t ((className))::rhsSymbols[((grammar->rules.size()))] = {
+        {{
+            for (size_t rule = 0, rules = grammar->rules.size(); rule < rules; ++rule) {
+        }}
+                ((grammar->rules[rule]->size()))
+        {{ if (rule < rules - 1) }} ,
+        {{
+            }
+        }}
+        };
+
+        ((className))::NonTerminal ((className))::rule2lhs[((grammar->rules.size()))] = {
+        {{
+            for (size_t rule = 0, rules = grammar->rules.size(); rule < rules; ++rule) {
+        }}
+                ((grammar->rules[rule]->getLHS()->index))
+        {{ if (rule < rules - 1) }} ,
+        {{
+            }
+        }}
+        };
+
+        int ((className))::ActionMap[((grammar->rules.size()))] = {
+        {{
+            for (size_t rule = 0, rules = grammar->rules.size(); rule < rules; ++rule)
+                if (rule < rules)
+                    ((grammar->rules[rule]->action)), // ((rule))
+                else
+                    ((grammar->rules[rule]->action))  // ((rule))
+        {{
+            }
+        }}
+        };
+
+        void ((className))::reportError(State state, Input input) {
+        	std::cout << "Error: Found " << Terminals[input] << " Expecting ";
+
+        	Pair<Action>* pair = ShiftReduce_states[state - 1]->pair;
+        	if (pair) {
+        		for (size_t pairs = ShiftReduce_states[state - 1]->pairs; pairs > 0; --pairs) {
+        		    std::cout << Terminals[pair->input] << ( (pairs > 1) ? ", " : "\"");
+        		    ++pair;
+        		}
+        	}
+        	else
+        		std::cout << "<nothing>";
+        	std::cout << " in state " << state << " on line" << lexer->getLineNumber() << ".";
+        }
+
+        {{
+            if (actions->size())
+                actions->OutputActionsCXX(output, className, input_filename, returnType);
+        }}
+    }
+}

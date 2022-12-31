@@ -1,0 +1,406 @@
+//
+//	g/src/tools/g/g.pg
+//
+//  Property and Copyright (c) 2015-2022 Aaron Nathaniel Gray
+//
+
+grammar G "LR(1)" {
+
+header {
+	#include <io.h>
+	#include <iostream>
+	#include <cassert>
+
+	#include "g/Grammar/ExtendedGrammar.h"
+	class ParserGeneratorParser;
+	#include "g/ParserGenerator/ParserGenerator.h"
+
+	using namespace G::ParserGenerator;
+
+	extern ParserGenerator<ExtendedGrammar>* parserGenerator;
+
+    struct Token {
+        Token(std::string name) : name(name) {}
+        std::string name;
+    };
+	typedef Token Keyword;
+    struct Identifier : public Token {
+        Identifier(std::string name) : Token(name) {}
+    };
+
+	union ValueType {
+		ExtendedGrammar* Grammar;
+		ExtendedGrammar::Rules* Rules;
+		ExtendedGrammar::Rule* Rule;
+		ExtendedGrammar::Productions* Productions;
+		ExtendedGrammar::Production* Production;
+		ExtendedGrammar::NamedFactors* NamedFactors;
+		ExtendedGrammar::NamedFactor* NamedFactor;
+		ExtendedGrammar::Factor* Grouping;
+		ExtendedGrammar::Selection* Selection;
+		ExtendedGrammar::Sequence* Sequence;
+		ExtendedGrammar::Factor* Factor;
+		ExtendedGrammar::Symbol* Symbol;
+		ExtendedGrammar::Identifier* Identifier;
+		ExtendedGrammar::StringLiteral* StringLiteral;
+		int Action;
+		CodeBlock* CodeBlock;
+	};
+
+	extern ValueType currentValue;
+	using namespace Runtime;
+};
+
+code {
+	#include "g.lg.h"
+	ValueType currentValue;
+	unsigned Precedence = 1;
+};
+code {
+	void gParser::reportError(State state, Input input) {
+		std::string report = std::string("Found ") + Terminals[input] + " Expecting ";
+
+		Pair<Action>* pair = ShiftReduce_states[state - 1]->pair;
+		if (pair) {
+			for (size_t pairs = ShiftReduce_states[state - 1]->pairs; pairs > 0; --pairs) {
+                report += std::string(Terminals[pair->input]) + ((pairs > 1) ? ", " : "");
+				++pair;
+			}
+		}
+		else
+            report += std::string("<nothing>");
+        report += std::string(" in state ") + std::to_string(state) + ".\n";
+
+		G::logger->LogError(new SyntaxErrorObject(report, lexer->getLineNumber(), lexer->getCharacter()));
+	}
+};
+
+roottype "ExtendedGrammar";
+basetype union "ValueType";
+
+nonterm File;
+nonterm Grammar : Grammar;
+nonterm Headers;
+nonterm Header;
+nonterm Precedences;
+nonterm Precedence;
+nonterm NonAssociative;
+nonterm NonAssociativeTerminals;
+nonterm NonAssociativeTerminal;
+nonterm LeftAssociative;
+nonterm LeftAssociativeTerminals;
+nonterm LeftAssociativeTerminal;
+nonterm RightAssociative;
+nonterm RightAssociativeTerminals;
+nonterm RightAssociativeTerminal;
+nonterm Footer;
+nonterm BlankLines;
+nonterm Rules : Rules;
+nonterm Rule : Rule;
+nonterm Productions : Productions;
+nonterm Production : Production;
+nonterm NamedSymbols : NamedSymbols;
+nonterm NamedSymbol : NamedSymbol;
+
+nonterm NamedFactors : NamedFactors;
+nonterm NamedFactor : NamedFactor;
+nonterm Factor : Factor;
+
+nonterm Grouping : Factor;
+//nonterm Expression : Expression;
+nonterm Selection : Selection;
+nonterm Sequence : Sequence;
+
+nonterm Symbol : Symbol;
+nonterm Identifier;
+nonterm Keyword;
+
+term KEYWORD_GRAMMAR			"grammar";
+term KEYWORD_TERM				"term";
+term KEYWORD_NONTERM			"nonterm";
+term KEYWORD_PRODUCTION			"production";
+term KEYWORD_START				"start";
+term KEYWORD_CODE				"code";
+term KEYWORD_HEADER				"header";
+
+term KEYWORD_ROOTTYPE			"roottype";
+
+term KEYWORD_BASECLASS			"baseclass";
+term KEYWORD_BASETYPE			"basetype";
+term KEYWORD_RETURNTYPE			"returntype";
+term KEYWORD_UNION				"union";
+
+term KEYWORD_NONASSOC			"nonassoc";
+term KEYWORD_LEFT				"left";
+term KEYWORD_RIGHT				"right";
+
+term OPERATOR_DOLLAR			"$";
+term OPERATOR_EPSILON			"epsilon";
+
+term OPERATOR_OPEN_CURLY_BRACE		"{";
+term OPERATOR_CLOSE_CURLY_BRACE		"}";
+term OPERATOR_EQUALS				"=";
+term OPERATOR_OR					"|";
+term OPERATOR_STAR					"*";
+term OPERATOR_PLUS					"+";
+term OPERATOR_LEFT_PARENTHESIS		"(";
+term OPERATOR_RIGHT_PARENTHESIS		")";
+term OPERATOR_LEFT_BRACKET			"[";
+term OPERATOR_RIGHT_BRACKET			"]";
+term OPERATOR_LEFT_ANGLED_BRACKET	"<";
+term OPERATOR_RIGHT_ANGLED_BRACKET	">";
+term OPERATOR_COLON					":";
+term OPERATOR_SEMICOLON				";";
+
+term IDENTIFIER : Identifier;
+term STRING_LITERAL : StringLiteral;
+term TOKEN_ACTION : Action;
+term TOKEN_CODE : CodeBlock;
+term NEWLINE;
+
+start File;
+
+production File = Grammar;
+
+production Grammar = "grammar" "{" Headers Precedences Rules "}" Footer;
+
+production Headers =
+	Header ";" Headers
+	| Header ";"
+;
+
+production Header =
+	"term" identifier:Identifier
+		{ root->addTerminal(root->newTerminal($identifier$)); }
+    | "term" identifier:Identifier ":" type:Identifier
+		{ root->addTerminal(root->newTerminal($identifier$, $type$)); }
+    | "term" identifier:Identifier literal:STRING_LITERAL
+		{ root->addTerminal(root->newTerminal($identifier$, $literal$)); }
+    | "term" identifier:Identifier ":" type:Identifier literal:STRING_LITERAL
+		{ root->addTerminal(root->newTerminal($identifier$, $type$, $literal$)); }
+    | "nonterm" idenfifier:Identifier
+  		{ root->addNonTerminal(root->newNonTerminal($idenfifier$)); }
+    | "nonterm" idenfifier:Identifier ":" type:Identifier
+  		{ root->addNonTerminal(root->newNonTerminal($idenfifier$, $type$)); }
+    | "start" idenfifier:Identifier
+		{ root->setStartSymbol(root->getNonTerminal($idenfifier$)); }
+    | "header" _code:TOKEN_CODE
+		{ parserGenerator->addHeader($_code$); }
+	| "code" _code:TOKEN_CODE
+		{ parserGenerator->addCode($_code$); }
+	| "roottype" type:STRING_LITERAL
+		{ parserGenerator->setRootType($type$->getValue()); }
+	| "baseclass" literal:STRING_LITERAL
+		{ parserGenerator->setBaseClass($literal$->getValue()); }
+	| "basetype" literal:STRING_LITERAL
+		{ parserGenerator->setBaseType($literal$->getValue()); }
+	| "basetype" "union" literal:STRING_LITERAL
+		{ parserGenerator->setBaseType($literal$->getValue(), true); }
+    | "returntype" literal:STRING_LITERAL
+		{ parserGenerator->setReturnType($literal$->getValue()); }
+	| BlankLines
+;
+
+production Precedences =
+    Precedences Precedence ";" { ++Precedence; }
+    | Precedence ";" { ++Precedence; }
+    |
+;
+
+production Precedence =
+    "nonassoc" NonAssociativeTerminals
+    | "left" LeftAssociativeTerminals
+    | "right" RightAssociativeTerminals
+;
+
+production NonAssociativeTerminals =
+    NonAssociativeTerminals NonAssociativeTerminal
+    | NonAssociativeTerminal
+;
+
+production NonAssociativeTerminal =
+	STRING_LITERAL
+		{
+			ExtendedGrammar::Terminal* terminal = root->getTerminal($1);
+			terminal->setAssociativity(ExtendedGrammar::Associativity::None);
+			terminal->setPrecedence(Precedence);
+		}
+	| Identifier
+		{
+			ExtendedGrammar::Terminal* terminal = root->getTerminal($1);
+			terminal->setAssociativity(ExtendedGrammar::Associativity::None);
+			terminal->setPrecedence(Precedence);
+		}
+;
+
+production LeftAssociativeTerminals =
+    LeftAssociativeTerminals LeftAssociativeTerminal
+    | LeftAssociativeTerminal
+;
+
+production LeftAssociativeTerminal =
+	STRING_LITERAL
+		{
+			ExtendedGrammar::Terminal* terminal = root->getTerminal($1);
+			terminal->setAssociativity(ExtendedGrammar::Associativity::Left);
+			terminal->setPrecedence(Precedence);
+		}
+	| Identifier
+		{
+			ExtendedGrammar::Terminal* terminal = root->getTerminal($1);
+			terminal->setAssociativity(ExtendedGrammar::Associativity::Left);
+			terminal->setPrecedence(Precedence);
+		}
+;
+
+production RightAssociativeTerminals =
+    RightAssociativeTerminals RightAssociativeTerminal
+    | RightAssociativeTerminal
+;
+
+production RightAssociativeTerminal =
+	STRING_LITERAL
+		{
+			ExtendedGrammar::Terminal* terminal = root->getTerminal($1);
+			terminal->setAssociativity(ExtendedGrammar::Associativity::Right);
+			terminal->setPrecedence(Precedence);
+		}
+	| Identifier
+		{
+			ExtendedGrammar::Terminal* terminal = root->getTerminal($1);
+			terminal->setAssociativity(ExtendedGrammar::Associativity::Right);
+			terminal->setPrecedence(Precedence);
+		}
+;
+
+production Footer = BlankLines
+;
+
+production BlankLines = BlankLines NEWLINE | epsilon
+;
+
+//
+
+production Rules =
+	Rules Rule
+		{ root->addRule($2); }
+	| Rule
+		{ root->addRule($1); }
+;
+
+production Rule = "production" identifier:Identifier "=" productions:Productions ";"
+	{ $$ = root->newRule($identifier$, $productions$); }
+;
+
+production Productions = productions:Productions "|" production1:Production
+		{ $$ = $productions$; $productions$->addProduction($production1$); }
+	| production1:Production
+		{ $$ = root->newProductions(); $$->addProduction($production1$); }
+;
+
+production Production = factors:NamedFactors
+		{ $$ = root->newProduction($factors$); }
+	| factors:NamedFactors action:TOKEN_ACTION
+		{ $$ = root->newProduction($factors$, $action$); }
+	| "epsilon"
+		{ $$ = root->newProduction(); }
+	| "epsilon" action:TOKEN_ACTION
+		{ $$ = root->newProduction($action$); }
+	| epsilon
+		{ $$ = root->newProduction(); }
+	| TOKEN_ACTION
+		{ $$ = root->newProduction($1); }
+;
+
+production NamedFactors =
+	factors:NamedFactors factor:NamedFactor
+		{ $$ = $factors$; $factors$->add($factor$); }
+	| factor:NamedFactor
+		{ $$ = root->newNamedFactors(); $$->add($factor$); }
+;
+
+production NamedFactor = identifier:Identifier ":" factor:Factor
+		{ $$ = root->newNamedFactor($identifier$, $factor$); }
+	| factor:Factor
+		{ $$ = root->newNamedFactor($factor$); }
+;
+
+production Factor =
+	grouping:Grouping "*"
+		{ $$ = root->newOptionalRepetition($grouping$); }
+	| grouping:Grouping "+"
+		{ $$ = root->newRepetition($grouping$); }
+	| grouping:Grouping
+		{ $$ = $grouping$; }
+;
+
+production Grouping =
+	"(" selection:Selection ")"
+		{ $$ = $selection$; }
+	| "[" selection:Selection "]"
+		{ $$ = root->newOptional($selection$); }
+	| symbol:Symbol
+		{ $$ = new ExtendedGrammar::Factor($symbol$); }
+;
+
+production Selection =
+	selection:Selection "|" sequence:Sequence
+		{ $$ = $selection$; $selection$->add($sequence$); }
+	| sequence:Sequence
+		{ $$ = root->newSelection(); $$->add($sequence$); }
+;
+
+production Sequence =
+	sequence:Sequence factor:Factor
+		{ $$ = $sequence$; $sequence$->add($factor$); }
+	| factor:Factor
+		{ $$ = root->newSequence(); $$->add($factor$); }
+;
+
+production Symbol = Identifier
+        {
+    		ExtendedGrammar::Symbol* symbol = root->getSymbol($1);
+    		if (symbol == ExtendedGrammar::getErrorSymbol() || symbol == nullptr)
+    			G::logger->LogError(new UndefinedSymbolErrorObject($1->getValue(), lexer->getLineNumber(), lexer->getCharacter()));
+    		$$ = symbol;
+    	}
+	| STRING_LITERAL
+        {
+    		ExtendedGrammar::Symbol* symbol = root->getTerminal($1);
+    		if (symbol == ExtendedGrammar::getErrorSymbol() || symbol == nullptr)
+    			G::logger->LogError(new UndefinedTerminalSymbolErrorObject($1->getValue(), lexer->getLineNumber(), lexer->getCharacter()));
+    		$$ = symbol;
+    	}
+    | "$"
+        {
+    		$$ = root->getTerminal(root->newStringLiteral("$"));
+    	}
+;
+
+production Keyword =
+	"grammar"
+	| "term"
+	| "nonterm"
+	| "production"
+	| "start"
+	| "code"
+	| "header"
+	| "baseclass"
+	| "roottype"
+	| "basetype"
+	| "returntype"
+	| "union"
+	| "nonassoc"
+	| "left"
+	| "right"
+	| "epsilon"
+;
+
+production Identifier =
+	Keyword
+	| IDENTIFIER
+;
+
+}
+
+// End g/src/tools/g/g.pg

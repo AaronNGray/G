@@ -1,0 +1,167 @@
+//
+//  g/src/tools/ag/ag.lg
+//
+//  Property and Copyright © 2016 - 2022 Aaron Nathaniel Gray under the MIT License
+//
+
+lexer AG {
+	start INITIAL
+	header {
+		#include <string>
+		#include <map>
+		#include "g/AbstractSyntaxTreeGenerator/AbstractSyntaxTree.h"
+		#include "nonstd/Utils.h"
+		#include "ag.pg.h"
+
+		enum MODE { NORMAL, CODE_BLOCK };
+	}
+	code {
+		std::string action;
+		int yyfnln;		// TODO: Check
+		int curley_braces = 0;
+		MODE bracket_mode = NORMAL;
+		bool inaction = false;
+
+		using namespace Runtime;
+	}
+
+	baseclass "Lexer"
+	roottype "AbstractSyntaxTree"
+	valuetype "ValueType"
+
+    context INITIAL {
+    	"module"				    { return agParser::KEYWORD_MODULE; }
+    	/[A-Za-z_][A-Za-z0-9_]*/	{
+										currentValue.Identifier = root->newIdentifier(std::string(begin(), end()));
+										return agParser::Identifier;
+									}
+    	"{"					        { push(Context::MODULE); return agParser::OPERATOR_OPEN_CURLY_BRACE; }
+    	"}"					        { std::cerr << "Extra invalid closing brace" << std::endl; return ERROR; }
+		"/*"						{ push(Context::COMMENT); return IGNORE; }
+		"//"						{ push(Context::SINGLE_LINE_COMMENT); return IGNORE; }
+    	/[ \t]+/            		{ return IGNORE; }
+    	/\r?\n+/         			{ newLine(); return IGNORE; }
+    	/./							{
+    	                                std::cerr << "Invalid chararcter '" << toString(*begin())
+    	                                          << "' in outer scope on line " << getLineNumber() << std::endl;
+    	                                return ERROR;
+    	                            }
+    }
+
+	context MODULE {
+		"code"						{ bracket_mode = MODE::CODE_BLOCK; return agParser::KEYWORD_CODE; }
+		"header"					{ bracket_mode = MODE::CODE_BLOCK; return agParser::KEYWORD_HEADER; }
+
+    	"datatype"			        { return agParser::KEYWORD_DATATYPE; }
+
+		/[A-Za-z_][A-Za-z0-9_]*/	{
+										currentValue.Identifier = root->newIdentifier(std::string(begin(), end()));
+										return agParser::Identifier;
+									}
+    	":"						    { return agParser::OPERATOR_COLON; }
+    	";"						    { return agParser::OPERATOR_SEMICOLON; }
+    	","						    { return agParser::OPERATOR_COMMA; }
+    	"="						    { return agParser::OPERATOR_EQUALS; }
+    	"|"						    { return agParser::OPERATOR_BAR; }
+		"{"				            {
+										push(CODE);
+										yyfnln = getLineNumber();
+										curley_braces = 1;
+										action = "";
+										return IGNORE;
+									}
+    	"}"					        { pop(); return agParser::OPERATOR_CLOSE_CURLY_BRACE; }
+		"/*"						{ push(Context::COMMENT); return IGNORE; }
+		"//"						{ push(Context::SINGLE_LINE_COMMENT); return IGNORE; }
+    	/[ \t]+/            		{ return IGNORE; }
+    	/\r?\n/			            { newLine(); return IGNORE; }
+    	/./							{
+    	                                std::cerr << "Invalid character '" << toString(*begin())
+    	                                          << "' in lexer block on line " << getLineNumber() << std::endl;
+    	                                return ERROR;
+    	                            }
+	}
+
+	context CODE {
+    	"{"		    	            				{ action += _begin[0]; ++curley_braces; return IGNORE; }
+    	"}"              							{
+                    									if (--curley_braces == 0) {
+                    										pop();
+                    										currentValue.Code = root->newCode(action);
+                    										return agParser::Code;
+                    									}
+														else {
+	                    									action += "}";
+		                									return IGNORE;
+														}
+                    								}
+    	/\"/						                { push(ACTION_DOUBLE_QUOTED_STRING); action += "\""; return IGNORE; }
+    	/\'(\\([0-7]+|[xX][0-9A-Fa-f]+|[^\n]))\'/	{
+													  for (auto i = begin(); i != end(); ++i)
+														action += *i;
+													  return IGNORE;
+													}
+    	/\'.\'/						                {
+													  for (auto i = begin(); i != end(); ++i)
+														action += *i;
+													  return IGNORE;
+													}
+    	/\r?\n/						                {
+													  newLine();
+													  action += '\n';
+													  return IGNORE;
+													}
+    	/./							                { action += *begin(); return IGNORE; }
+	}
+
+	context ACTION_DOUBLE_QUOTED_STRING {
+		/"/								{ action += *begin(); pop(); return IGNORE; }
+		/\\/							{ action += *begin(); push(ACTION_DOUBLE_QUOTED_STRING_ESCAPE_SEQUENCE); return IGNORE; }
+		/./								{ action += *begin(); return IGNORE; }
+	}
+
+	context ACTION_DOUBLE_QUOTED_STRING_ESCAPE_SEQUENCE {
+    	/[xX][0-9A-Fa-f]+/			{
+									  for (auto i = begin(); i != end(); ++i)
+										action += *i;
+									  pop();
+									  return IGNORE;
+									}
+    	/[0-7]+/  					{
+									  for (auto i = begin(); i != end(); ++i)
+										action += *i;
+									  pop();
+									  return IGNORE;
+									}
+    	/a/    						{ action += *begin(); pop(); return IGNORE; }
+    	/b/    						{ action += *begin(); pop(); return IGNORE; }
+    	/f/    						{ action += *begin(); pop(); return IGNORE; }
+    	/n/    						{ action += *begin(); pop(); return IGNORE; }
+    	/r/    						{ action += *begin(); pop(); return IGNORE; }
+    	/t/    						{ action += *begin(); pop(); return IGNORE; }
+    	/v/    						{ action += *begin(); pop(); return IGNORE; }
+    	/\\/    					{ action += *begin(); pop(); return IGNORE; }
+    	/'/    						{ action += *begin(); pop(); return IGNORE; }
+    	/"/  						{ action += *begin(); pop(); return IGNORE; }
+    	/\?/    					{ action += *begin(); pop(); return IGNORE; }
+    	/./   						{
+    	                                std::cerr << "Invalid escape sequence '\\" << *begin()
+    	                                          << "' in quoted string on line " << getLineNumber() << std::endl;
+										action += *begin();
+										pop();
+    	                                return ERROR;
+    	                            }
+	}
+
+	context COMMENT {
+		"*/"						{ pop(); return IGNORE; }
+		/\r?\n/						{ newLine(); return IGNORE; }
+		/./							{ return IGNORE;}
+	}
+	context SINGLE_LINE_COMMENT {
+		/\r?\n/						{ newLine(); pop(); return IGNORE; }
+		/./							{ return IGNORE; }
+	}
+}
+
+// End g/src/tools/ag/ag.lg

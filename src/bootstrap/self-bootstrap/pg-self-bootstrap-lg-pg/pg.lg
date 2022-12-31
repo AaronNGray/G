@@ -1,0 +1,247 @@
+//
+//	g/bootstrap/self-bootstrap/pg-self-bootstrap-lg-pg/pg.lg
+//
+//  Property and Copyright (c) 2017-2022 Aaron Nathaniel Gray
+//
+
+lexer LG {
+	start INITIAL
+	header {
+		#include <iostream>
+		#include "g/Grammar/ContextFreeGrammar.h"
+		#include "g/CodeBlock.h"
+		#include "g/Actions.h"
+		#include "nonstd/Utils.h"
+		#include "pg.pg.h"
+
+//		extern Grammar*	grammar;	// TODO: fold in and remove !!!
+
+		enum MODE { NORMAL, CODE_BLOCK, PRODUCTIONS };
+	}
+	code {
+		std::string action;
+		std::string stringLiteral;
+
+		int yyfnln;
+		int curley_braces = 0;
+		MODE bracket_mode = MODE::NORMAL;
+	}
+
+	baseclass "Lexer"
+	roottype "ContextFreeGrammar"
+	valuetype "ValueType"
+
+    context INITIAL {
+        "grammar"		{ currentValue.Identifier = root->newIdentifier(text()); return pgParser::KEYWORD_GRAMMAR; }
+
+    	/[A-Za-z_][A-Za-z0-9_]*/	{
+										currentValue.Identifier = root->newIdentifier(text());
+										return pgParser::IDENTIFIER;
+									}
+        /"/				{ push(Context::LEX_STRING_LITERAL); stringLiteral = ""; return IGNORE; }
+
+		"{"				{ push(Context::GRAMMAR); return pgParser::OPERATOR_OPEN_CURLY_BRACE; }
+
+		"/*"			{ push(Context::COMMENT); return IGNORE; }
+		"//"			{ push(Context::SINGLE_LINE_COMMENT); return IGNORE; }
+
+        /[ \t]+/        { return IGNORE; }
+        /\r?\n/			{ newLine(); return IGNORE; }
+        /./				{ std::cout << "Invalid chararcter '" << toString(*begin()) << "'\n"; return IGNORE; }
+    }
+
+	context GRAMMAR {
+        "term"			{ currentValue.Identifier = root->newIdentifier(text()); return pgParser::KEYWORD_TERM; }
+        "nonterm"		{ currentValue.Identifier = root->newIdentifier(text()); return pgParser::KEYWORD_NONTERM; }
+        "start"			{ currentValue.Identifier = root->newIdentifier(text()); return pgParser::KEYWORD_START; }
+
+        "production"	{ currentValue.Identifier = root->newIdentifier(text()); return pgParser::KEYWORD_PRODUCTION; }
+		"code"			{ currentValue.Identifier = root->newIdentifier(text()); bracket_mode = MODE::CODE_BLOCK; return pgParser::KEYWORD_CODE; }
+		"header"		{ currentValue.Identifier = root->newIdentifier(text()); bracket_mode = MODE::CODE_BLOCK; return pgParser::KEYWORD_HEADER; }
+
+		"roottype"		{ currentValue.Identifier = root->newIdentifier(text()); return pgParser::KEYWORD_ROOTTYPE; }
+		"baseclass"		{ currentValue.Identifier = root->newIdentifier(text()); return pgParser::KEYWORD_BASECLASS; }
+		"basetype"		{ currentValue.Identifier = root->newIdentifier(text()); return pgParser::KEYWORD_BASETYPE; }
+		"returntype"	{ currentValue.Identifier = root->newIdentifier(text()); return pgParser::KEYWORD_RETURNTYPE; }
+		"union"			{ currentValue.Identifier = root->newIdentifier(text()); return pgParser::KEYWORD_UNION; }
+
+		"nonassoc"		{ currentValue.Identifier = root->newIdentifier(text()); return pgParser::KEYWORD_NONASSOC; }
+		"left"			{ currentValue.Identifier = root->newIdentifier(text()); return pgParser::KEYWORD_LEFT; }
+		"right"			{ currentValue.Identifier = root->newIdentifier(text()); return pgParser::KEYWORD_RIGHT; }
+
+        "epsilon"		{ currentValue.Identifier = root->newIdentifier(text()); return pgParser::OPERATOR_EPSILON; }
+
+		":"				{ return pgParser::OPERATOR_COLON; }
+
+    	/[A-Za-z_][A-Za-z0-9_]*/	{
+										currentValue.Identifier = root->newIdentifier(text());
+										return pgParser::IDENTIFIER;
+									}
+        /"/				{ push(Context::LEX_STRING_LITERAL); stringLiteral = ""; return IGNORE; }
+
+		"$"				{ return pgParser::OPERATOR_DOLLAR; }
+		"="				{ return pgParser::OPERATOR_EQUALS; }
+		"|"				{ return pgParser::OPERATOR_OR; }
+		":"				{ return pgParser::OPERATOR_COLON; }
+		";"				{ return pgParser::OPERATOR_SEMICOLON; }
+
+		/[a-zA-Z_][a-zA-Z0-9_]*/     {
+										currentValue.Identifier = root->newIdentifier(text());
+										return pgParser::IDENTIFIER;
+									 }
+
+		/\"/			{ push(Context::LEX_STRING_LITERAL); stringLiteral = ""; return IGNORE; }
+
+		"{"				{
+							if (bracket_mode == MODE::NORMAL) {
+								push(Context::ACTION);
+								yyfnln = getLineNumber();
+								curley_braces = 1;
+								action = *begin();
+								return IGNORE;
+							}
+							else
+							{
+								push(Context::CODE);
+								yyfnln = getLineNumber();
+								curley_braces = 1;
+								action = "";
+								bracket_mode = MODE::NORMAL;
+								return IGNORE;
+							}
+						}
+
+		"}"				{ bracket_mode = MODE::NORMAL; pop(); return pgParser::OPERATOR_CLOSE_CURLY_BRACE;}
+
+		"/*"			{ push(Context::COMMENT); return IGNORE; }
+		"//"			{ push(Context::SINGLE_LINE_COMMENT); return IGNORE; }
+
+        /[ \t]+/        { return IGNORE; }
+        /\r?\n/			{ newLine(); return IGNORE; }
+        /./				{ std::cout << "Invalid chararcter '" << toString(*begin()) << "'\n"; return IGNORE; }
+	}
+
+	context LEX_STRING_LITERAL {
+    	/\"/ 						{
+										currentValue.StringLiteral = root->newStringLiteral(stringLiteral);
+										pop();
+										return pgParser::STRING_LITERAL;
+									}
+    	/./							{
+										stringLiteral += *begin();
+										return IGNORE;
+									}
+    }
+
+	context ACTION {
+    	"{"		    	            				{ action += *begin(); ++curley_braces; return IGNORE; }
+    	"}"              							{
+                    									action += "}";
+                    									if (--curley_braces == 0) {
+                    										pop();
+                    										currentValue.Action = root->addAction(action, yyfnln);
+                    										return pgParser::TOKEN_ACTION;
+                    									}
+                    									return IGNORE;
+                    								}
+    	/\"/						                { push(ACTION_DOUBLE_QUOTED_STRING); action += "\""; return IGNORE; }
+    	/\'(\\([0-7]+|[xX][0-9A-Fa-f]+|[^\n]))\'/	{
+													  for (auto i = begin(); i != end(); ++i)
+														action += *i;
+													  return IGNORE;
+													}
+    	/\'.\'/						                {
+													  for (auto i = begin(); i != end(); ++i)
+														action += *i;
+													  return IGNORE;
+													}
+    	/\r?\n/						                {
+													  newLine();
+													  action += '\n';
+													  return IGNORE;
+													}
+    	/./							                { action += *begin(); return IGNORE; }
+	}
+
+	context CODE {
+    	"{"		    	            				{ action += _begin[0]; ++curley_braces; return IGNORE; }
+    	"}"              							{
+                    									if (--curley_braces == 0) {
+                    										pop();
+                    										currentValue.CodeBlock = new CodeBlock(action.c_str(), yyfnln, filename);
+                    										return pgParser::TOKEN_CODE;
+                    									}
+														else {
+	                    									action += "}";
+		                									return IGNORE;
+														}
+                    								}
+    	/\"/						                { push(ACTION_DOUBLE_QUOTED_STRING); action += "\""; return IGNORE; }
+    	/\'(\\([0-7]+|[xX][0-9A-Fa-f]+|[^\n]))\'/	{
+													  for (auto i = begin(); i != end(); ++i)
+														action += *i;
+													  return IGNORE;
+													}
+    	/\'.\'/						                {
+													  for (auto i = begin(); i != end(); ++i)
+														action += *i;
+													  return IGNORE;
+													}
+    	/\r?\n/						                {
+													  newLine();
+													  action += '\n';
+													  return IGNORE;
+													}
+    	/./							                { action += *begin(); return IGNORE; }
+	}
+
+	context ACTION_DOUBLE_QUOTED_STRING {
+		/"/								{ action += *begin(); pop(); return IGNORE; }
+		/\\/							{ action += *begin(); push(ACTION_DOUBLE_QUOTED_STRING_ESCAPE_SEQUENCE); return IGNORE; }
+		/./								{ action += *begin(); return IGNORE; }
+	}
+
+	context ACTION_DOUBLE_QUOTED_STRING_ESCAPE_SEQUENCE {
+    	/[xX][0-9A-Fa-f]+/			{
+									  for (auto i = begin(); i != end(); ++i)
+										action += *i;
+									  pop();
+									  return IGNORE;
+									}
+    	/[0-7]+/  					{
+									  for (auto i = begin(); i != end(); ++i)
+										action += *i;
+									  pop();
+									  return IGNORE;
+									}
+    	/a/    						{ action += *begin(); pop(); return IGNORE; }
+    	/b/    						{ action += *begin(); pop(); return IGNORE; }
+    	/f/    						{ action += *begin(); pop(); return IGNORE; }
+    	/n/    						{ action += *begin(); pop(); return IGNORE; }
+    	/r/    						{ action += *begin(); pop(); return IGNORE; }
+    	/t/    						{ action += *begin(); pop(); return IGNORE; }
+    	/v/    						{ action += *begin(); pop(); return IGNORE; }
+    	/\\/    					{ action += *begin(); pop(); return IGNORE; }
+    	/'/    						{ action += *begin(); pop(); return IGNORE; }
+    	/"/  						{ action += *begin(); pop(); return IGNORE; }
+    	/\?/    					{ action += *begin(); pop(); return IGNORE; }
+    	/./   						{
+    	                                std::cerr << "Invalid escape sequence '\\" << _begin[0]
+    	                                          << "' in quoted string on line " << getLineNumber() << std::endl;
+										action += *begin();
+										pop();
+    	                                return ERROR;
+    	                            }
+	}
+	context COMMENT {
+		"*/"						{ pop(); return IGNORE; }
+        /\r?\n/						{ newLine(); return IGNORE; }
+		/./							{ return IGNORE;}
+	}
+	context SINGLE_LINE_COMMENT {
+		/\r?\n/						{ newLine(); pop(); return IGNORE; }
+		/./							{ return IGNORE; }
+	}
+}
+
+// End g/bootstrap/self-bootstrap/pg-self-bootstrap-lg-pg/pg.lg

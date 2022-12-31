@@ -1,0 +1,290 @@
+//
+//	g/src/bootstrap/flex-bison-bootstrap/lg-bootstrap-lg-bison/pg.lg
+//
+//  Property and Copyright (c) 2015-2022 Aaron Nathaniel Gray
+//
+
+lexer LG {
+	start INITIAL
+	header {
+		#include <iostream>
+		#include "g/Grammar/ContextFreeGrammar.h"
+		using namespace G::Grammar;
+		#include "g/CodeBlock.h"
+		#include "nonstd/Utils.h"
+		#include "pg.tab.h"
+
+		extern ContextFreeGrammar*	grammar;
+
+		extern std::string action;
+		extern char identifier[132];
+	}
+	code {
+		std::string action;
+
+		std::string stringLiteral;
+		char identifier[132];
+
+		int yylloc = 1;
+		int yyfnln;
+		int curley_braces = 0;
+		enum MODE { NORMAL, CODE_BLOCK, PRODUCTIONS };
+		MODE bracket_mode = NORMAL;
+
+		using namespace Runtime;
+	}
+
+	baseclass "Runtime::Lexer"
+
+    context INITIAL {
+        "grammar"		{ return KEYWORD_GRAMMAR; }
+
+    	/[A-Za-z_][A-Za-z0-9_]*/	{
+										char* id = identifier;
+										for (auto i = begin(); i != _end; ++i, ++id)
+											*id = *i;
+										*id = '\0';
+
+										yylval.Identifier = grammar->newIdentifier(identifier);
+										return IDENTIFIER;
+									}
+
+        /"/				{ push(Context::LEX_STRING_LITERAL); stringLiteral = ""; return IGNORE; }
+
+		"{"				{ push(Context::GRAMMAR); return OPERATOR_OPEN_CURLY_BRACE; }
+
+		"/*"			{ push(Context::COMMENT); return IGNORE; }
+		"//"			{ push(Context::SINGLE_LINE_COMMENT); return IGNORE; }
+
+        /\r?\n/			{ ++yylloc; return IGNORE; }
+        /[ \t]+/        { return IGNORE; }
+        /./				{ std::cout << "Invalid chararcter '" << toString(_begin[0]) << "'\n"; return IGNORE; }
+    }
+
+
+	context GRAMMAR {
+        "term"			{ return KEYWORD_TERM; }
+        "nonterm"		{ return KEYWORD_NONTERM; }
+        "start"			{ return KEYWORD_START; }
+
+        "production"	{ bracket_mode = MODE::NORMAL; return KEYWORD_PRODUCTION; }
+		"code"			{ bracket_mode = MODE::CODE_BLOCK; return KEYWORD_CODE; }
+		"header"		{ bracket_mode = MODE::CODE_BLOCK; return KEYWORD_HEADER; }
+
+		"roottype"		{ return KEYWORD_ROOTTYPE; }
+
+		"baseclass"		{ return KEYWORD_BASECLASS; }
+		"basetype"		{ return KEYWORD_BASETYPE; }
+		"union"			{ return KEYWORD_UNION; }
+
+		"nonassoc"		{ return KEYWORD_NONASSOC; }
+		"left"			{ return KEYWORD_LEFT; }
+		"right"			{ return KEYWORD_RIGHT; }
+
+		":"				{ return OPERATOR_COLON; }
+		"$"				{ return OPERATOR_DOLLAR; }
+		"="				{ return OPERATOR_EQUALS; }
+		"|"				{ return OPERATOR_OR; }
+		":"				{ return OPERATOR_COLON; }
+		";"				{ return OPERATOR_SEMICOLON; }
+
+        "epsilon"		{ return KEYWORD_EPSILON; }
+
+    	/[A-Za-z_][A-Za-z0-9_]*/	{
+										char* id = identifier;
+										for (auto i = begin(); i != _end; ++i, ++id)
+											*id = *i;
+										*id = '\0';
+										yylval.Identifier = grammar->newIdentifier(identifier);
+										return IDENTIFIER;
+									}
+
+        /"/				{ push(Context::LEX_STRING_LITERAL); stringLiteral = ""; return IGNORE; }
+
+		"{"				{
+							if (bracket_mode == MODE::NORMAL) {
+								push(Context::ACTION);
+								yyfnln = getLineNumber();
+								curley_braces = 1;
+								action = *begin();
+								return IGNORE;
+							}
+							else
+							{
+								push(Context::CODE);
+								yyfnln = getLineNumber();
+								curley_braces = 1;
+								action = "";
+								bracket_mode = MODE::NORMAL;
+								return IGNORE;
+							}
+						}
+
+		"}"				{ bracket_mode = MODE::NORMAL; pop(); return OPERATOR_CLOSE_CURLY_BRACE;}
+
+		"/*"			{ push(Context::COMMENT); return IGNORE; }
+		"//"			{ push(Context::SINGLE_LINE_COMMENT); return IGNORE; }
+
+        /\r?\n/			{ ++yylloc; return IGNORE; }
+        /[ \t]+/        { return IGNORE; }
+        /./				{ std::cout << "Invalid chararcter '" << toString(_begin[0]) << "'\n"; return IGNORE; }
+	}
+	context LEX_STRING_LITERAL {
+    	/\"/ 						{
+										yylval.StringLiteral = grammar->newStringLiteral(stringLiteral);
+										pop();
+										return STRING_LITERAL;
+									}
+    	/./							{
+										stringLiteral += *begin();
+										return IGNORE;
+									}
+    }
+
+	context PRODUCTIONS {
+		"}"				{ bracket_mode = MODE::NORMAL; pop(); return OPERATOR_CLOSE_CURLY_BRACE;}
+		"$"				{ return OPERATOR_DOLLAR; }
+
+		"="				{ return OPERATOR_EQUALS; }
+		"|"				{ return OPERATOR_OR; }
+		":"				{ return OPERATOR_COLON; }
+		";"				{ return OPERATOR_SEMICOLON; }
+
+        "epsilon"		{ return KEYWORD_EPSILON; }
+
+		/[a-zA-Z_][a-zA-Z0-9_]*/     {
+										yylval.Identifier = grammar->newIdentifier(std::string(begin(), end()));
+										return IDENTIFIER;
+									 }
+
+		/\"/			{ push(Context::LEX_STRING_LITERAL); stringLiteral = ""; return IGNORE; }
+
+		"{"				{
+							push(Context::ACTION);
+							yyfnln = yylloc;
+							curley_braces = 1;
+							action = _begin[0];
+							return IGNORE;
+						}
+
+		"/*"			{ push(Context::COMMENT); return IGNORE; }
+		"//"			{ push(Context::SINGLE_LINE_COMMENT); return IGNORE; }
+
+        /\r?\n/			{ ++yylloc; return IGNORE; }
+        /[ \t]+/        { return IGNORE; }
+
+		/./				{ std::cout << "Invalid chararcter '" << *begin() << "'\n"; return IGNORE; }
+	}
+
+	context ACTION {
+    	"{"		    	            				{ action += _begin[0]; ++curley_braces; return IGNORE; }
+    	"}"              							{
+                    									action += "}";
+                    									if (--curley_braces == 0) {
+                    										pop();
+                    										yylval.Action = grammar->addAction(action.c_str(), yyfnln);
+                    										return TOKEN_ACTION;
+                    									}
+                    									return IGNORE;
+                    								}
+    	/\"/						                { push(ACTION_DOUBLE_QUOTED_STRING); action += "\""; return IGNORE; }
+    	/\'(\\([0-7]+|[xX][0-9A-Fa-f]+|[^\n]))\'/	{
+													  for (auto i = begin(); i != end(); ++i)
+														action += *i;
+													  return IGNORE;
+													}
+    	/\'.\'/						                {
+													  for (auto i = begin(); i != end(); ++i)
+														action += *i;
+													  return IGNORE;
+													}
+    	/\r?\n/							            {
+													  ++yylloc;
+													  action += '\n';
+													  return IGNORE;
+													}
+    	/./							                { action += _begin[0]; return IGNORE; }
+	}
+
+	context CODE {
+    	"{"		    	            				{ action += _begin[0]; ++curley_braces; return IGNORE; }
+    	"}"              							{
+                    									if (--curley_braces == 0) {
+                    										pop();
+                    										yylval.CodeBlock = new CodeBlock(action.c_str(), yyfnln, filename);
+                    										return TOKEN_CODE;
+                    									}
+														else {
+	                    									action += "}";
+		                									return IGNORE;
+														}
+                    								}
+    	/\"/						                { push(ACTION_DOUBLE_QUOTED_STRING); action += "\""; return IGNORE; }
+    	/\'(\\([0-7]+|[xX][0-9A-Fa-f]+|[^\n]))\'/	{
+													  for (auto i = begin(); i != end(); ++i)
+														action += *i;
+													  return IGNORE;
+													}
+    	/\'.\'/						                {
+													  for (auto i = begin(); i != end(); ++i)
+														action += *i;
+													  return IGNORE;
+													}
+    	/\r?\n/						                {
+													  ++yylloc;
+													  action += '\n';
+													  return IGNORE;
+													}
+    	/./							                { action += _begin[0]; return IGNORE; }
+	}
+
+	context ACTION_DOUBLE_QUOTED_STRING {
+		/"/								{ action += _begin[0]; pop(); return IGNORE; }
+		/\\/							{ action += _begin[0]; push(ACTION_DOUBLE_QUOTED_STRING_ESCAPE_SEQUENCE); return IGNORE; }
+		/./								{ action += _begin[0]; return IGNORE; }
+	}
+
+	context ACTION_DOUBLE_QUOTED_STRING_ESCAPE_SEQUENCE {
+    	/[xX][0-9A-Fa-f]+/			{
+									  for (auto i = begin(); i != end(); ++i)
+										action += *i;
+									  pop();
+									  return IGNORE;
+									}
+    	/[0-7]+/  					{
+									  for (auto i = begin(); i != end(); ++i)
+										action += *i;
+									  pop();
+									  return IGNORE;
+									}
+    	/a/    						{ action += _begin[0]; pop(); return IGNORE; }
+    	/b/    						{ action += _begin[0]; pop(); return IGNORE; }
+    	/f/    						{ action += _begin[0]; pop(); return IGNORE; }
+    	/n/    						{ action += _begin[0]; pop(); return IGNORE; }
+    	/r/    						{ action += _begin[0]; pop(); return IGNORE; }
+    	/t/    						{ action += _begin[0]; pop(); return IGNORE; }
+    	/v/    						{ action += _begin[0]; pop(); return IGNORE; }
+    	/\\/    					{ action += _begin[0]; pop(); return IGNORE; }
+    	/'/    						{ action += _begin[0]; pop(); return IGNORE; }
+    	/"/  						{ action += _begin[0]; pop(); return IGNORE; }
+    	/\?/    					{ action += _begin[0]; pop(); return IGNORE; }
+    	/./   						{
+    	                                std::cerr << "Invalid escape sequence '\\" << _begin[0]
+    	                                          << "' in quoted string on line " << yylloc << std::endl;
+										action += _begin[0];
+										pop();
+    	                                return ERROR;
+    	                            }
+	}
+	context COMMENT {
+		"*/"						{ pop(); return IGNORE; }
+        /\r?\n/						{ ++yylloc; return IGNORE; }
+		/./							{ return IGNORE;}
+	}
+	context SINGLE_LINE_COMMENT {
+		/\r?\n/						{ ++yylloc; pop(); return IGNORE; }
+		/./							{ return IGNORE; }
+	}
+}
+
+// End g/src/bootstrap/flex-bison-bootstrap/pg-bootstrap-lg-bison/pg.lg

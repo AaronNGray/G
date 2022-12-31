@@ -1,0 +1,328 @@
+//
+//	g/tools/pg/pg.pg
+//
+//  Property and Copyright (c) 2017-2022 Aaron Nathaniel Gray
+//
+
+grammar PG "LR(1)" {
+
+header {
+	#include <io.h>
+	#include <iostream>
+	#include <cassert>
+
+	//#include "nonstd/Grammar/Grammar.h"
+	#include "g/ParserGenerator/ParserGeneratorParser.h"
+	#include "g/ParserGenerator/ParserGenerator.h"
+
+	using namespace G::ParserGenerator;
+
+	extern ParserGenerator<ContextFreeGrammar>* parserGenerator;
+
+    struct Token {
+        Token(std::string name) : name(name) {}
+        std::string name;
+    };
+	typedef Token Keyword;
+    struct Identifier : public Token {
+        Identifier(std::string name) : Token(name) {}
+    };
+
+	union ValueType {
+		ContextFreeGrammar *Grammar;
+		ContextFreeGrammar::Rules *Rules;
+		ContextFreeGrammar::Rule *Rule;
+		ContextFreeGrammar::Productions *Productions;
+		ContextFreeGrammar::Production *Production;
+		ContextFreeGrammar::NamedSymbols *NamedSymbols;
+		ContextFreeGrammar::NamedSymbol *NamedSymbol;
+		ContextFreeGrammar::Symbol *Symbol;
+		ContextFreeGrammar::Identifier *Identifier;
+		ContextFreeGrammar::StringLiteral *StringLiteral;
+		int Action;		// TODO: 'typedef ContextFreeGrammar::Action int'
+		CodeBlock* CodeBlock;
+	};
+
+	extern ValueType currentValue;
+	using namespace Runtime;
+};
+
+code {
+	#include "pg.lg.h"
+	ValueType currentValue;
+	unsigned Precedence = 1;
+};
+code {
+	void pgParser::reportError(State state, Input input) {
+		std::string report = std::string("Found ") + Terminals[input] + " Expecting ";
+
+		Pair<Action>* pair = ShiftReduce_states[state - 1]->pair;
+		if (pair) {
+			for (size_t pairs = ShiftReduce_states[state - 1]->pairs; pairs > 0; --pairs) {
+                report += std::string(Terminals[pair->input]) + ((pairs > 1) ? ", " : "");
+				++pair;
+			}
+		}
+		else
+            report += std::string("<nothing>");
+        report += std::string(" in state ") + std::to_string(state) + ".\n";
+
+		logger->LogError(new SyntaxErrorObject(report, lexer->getLineNumber(), lexer->getCharacter()));
+	}
+};
+
+roottype "ContextFreeGrammar";
+basetype union "ValueType";
+
+term KEYWORD_GRAMMAR			"grammar";
+term KEYWORD_TERM				"term";
+term KEYWORD_NONTERM			"nonterm";
+term KEYWORD_PRODUCTION			"production";
+term KEYWORD_START				"start";
+term KEYWORD_CODE				"code";
+term KEYWORD_HEADER				"header";
+
+term KEYWORD_ROOTTYPE			"roottype";
+
+term KEYWORD_BASECLASS			"baseclass";
+term KEYWORD_BASETYPE			"basetype";
+term KEYWORD_RETURNTYPE			"returntype";
+term KEYWORD_UNION				"union";
+
+term KEYWORD_NONASSOC			"nonassoc";
+term KEYWORD_LEFT				"left";
+term KEYWORD_RIGHT				"right";
+
+term OPERATOR_DOLLAR			"$";
+term OPERATOR_EPSILON			"epsilon";
+
+term OPERATOR_OPEN_CURLY_BRACE	"{";
+term OPERATOR_CLOSE_CURLY_BRACE	"}";
+term OPERATOR_EQUALS			"=";
+term OPERATOR_OR				"|";
+term OPERATOR_COLON				":";
+term OPERATOR_SEMICOLON			";";
+
+term IDENTIFIER : Identifier;
+term STRING_LITERAL : StringLiteral;
+term TOKEN_ACTION : Action;
+term TOKEN_CODE : CodeBlock;
+term NEWLINE;
+
+//nonterm Keyword
+//nonterm Identifier
+
+start File;
+
+production File = Grammar;
+
+production Grammar = "grammar" name:IDENTIFIER type:STRING_LITERAL "{" Headers Precedences Rules "}" Footer
+	{
+		parserGenerator->setName($name$->getValue());
+		parserGenerator->setType($type$->getValue());
+	}
+;
+
+production Headers =
+	Header ";" Headers
+	| Header ";"
+;
+
+production Header =
+	"term" Identifier
+		{ root->addTerminal(root->create<ContextFreeGrammar::Terminal>($2)); }
+  | "term" Identifier ":" Identifier
+		{ root->addTerminal(root->create<ContextFreeGrammar::Terminal>($2, $4)); }
+  | "term" Identifier STRING_LITERAL
+		{ root->addTerminal(root->create<ContextFreeGrammar::Terminal>($2, $3)); }
+  | "term" Identifier ":" Identifier STRING_LITERAL
+		{ root->addTerminal(root->create<ContextFreeGrammar::Terminal>($2, $4, $5)); }
+  | "nonterm" Identifier
+  		{ root->addNonTerminal(root->create<ContextFreeGrammar::NonTerminal>($2, $2)); }
+  | "nonterm" Identifier ":" Identifier
+  		{ root->addNonTerminal(root->create<ContextFreeGrammar::NonTerminal>($2, $4)); }
+    | "start" idenfifier:Identifier
+		{ root->setStartSymbol(root->getNonTerminal($idenfifier$)); }
+    | "header" _code:TOKEN_CODE
+		{ parserGenerator->addHeader($_code$); }
+	| "code" _code:TOKEN_CODE
+		{ parserGenerator->addCode($_code$); }
+	| "roottype" type:STRING_LITERAL
+		{ parserGenerator->setRootType($type$->getValue()); }
+	| "baseclass" literal:STRING_LITERAL
+		{ parserGenerator->setBaseClass($literal$->getValue()); }
+	| "basetype" literal:STRING_LITERAL
+		{ parserGenerator->setBaseType($literal$->getValue()); }
+	| "basetype" "union" literal:STRING_LITERAL
+		{ parserGenerator->setBaseType($literal$->getValue(), true); }
+    | "returntype" literal:STRING_LITERAL
+		{ parserGenerator->setReturnType($literal$->getValue()); }
+	| BlankLines
+;
+
+production Precedences =
+    Precedences Precedence ";" { ++Precedence; }
+    | Precedence ";" { ++Precedence; }
+    |
+;
+
+production Precedence =
+    "nonassoc" NonAssociativeTerminals
+    | "left" LeftAssociativeTerminals
+    | "right" RightAssociativeTerminals
+;
+
+production NonAssociativeTerminals =
+    NonAssociativeTerminals NonAssociativeTerminal
+    | NonAssociativeTerminal
+;
+
+production NonAssociativeTerminal =
+	STRING_LITERAL
+		{
+			ContextFreeGrammar::Terminal* terminal = root->getTerminal($1);
+			terminal->setAssociativity(ContextFreeGrammar::Associativity::None);
+			terminal->setPrecedence(Precedence);
+		}
+	| Identifier
+		{
+			ContextFreeGrammar::Terminal* terminal = root->getTerminal($1);
+			terminal->setAssociativity(ContextFreeGrammar::Associativity::None);
+			terminal->setPrecedence(Precedence);
+		}
+;
+
+production LeftAssociativeTerminals =
+    LeftAssociativeTerminals LeftAssociativeTerminal
+    | LeftAssociativeTerminal
+;
+
+production LeftAssociativeTerminal =
+	STRING_LITERAL
+		{
+			ContextFreeGrammar::Terminal* terminal = root->getTerminal($1);
+			terminal->setAssociativity(ContextFreeGrammar::Associativity::Left);
+			terminal->setPrecedence(Precedence);
+		}
+	| Identifier
+		{
+			ContextFreeGrammar::Terminal* terminal = root->getTerminal($1);
+			terminal->setAssociativity(ContextFreeGrammar::Associativity::Left);
+			terminal->setPrecedence(Precedence);
+		}
+;
+
+production RightAssociativeTerminals =
+    RightAssociativeTerminals RightAssociativeTerminal
+    | RightAssociativeTerminal
+;
+
+production RightAssociativeTerminal =
+	STRING_LITERAL
+		{
+			ContextFreeGrammar::Terminal* terminal = root->getTerminal($1);
+			terminal->setAssociativity(ContextFreeGrammar::Associativity::Right);
+			terminal->setPrecedence(Precedence);
+		}
+	| Identifier
+		{
+			ContextFreeGrammar::Terminal* terminal = root->getTerminal($1);
+			terminal->setAssociativity(ContextFreeGrammar::Associativity::Right);
+			terminal->setPrecedence(Precedence);
+		}
+;
+
+production Footer = BlankLines
+;
+
+production BlankLines = BlankLines NEWLINE | epsilon
+;
+
+production Rules =
+	Rules Rule
+		{ root->addRule($2); }
+	| Rule
+		{ root->addRule($1); }
+;
+
+production Rule = "production" identifier:Identifier "=" productions:Productions ";"
+		{ $$ = root->findOrCreateRule($identifier$, $productions$); }
+	| "production" identifier:Identifier ":" type:Identifier "=" productions:Productions ";"
+		{ $$ = root->findOrCreateRule($identifier$, $type$, $productions$); }
+;
+
+production Productions = productions:Productions "|" _production:Production
+		{ $$ = $productions$; $productions$->addProduction($_production$); }
+	| _production:Production
+		{ $$ = root->newProductions(); $$->addProduction($_production$); }
+;
+
+production Production = symbols:NamedSymbols
+		{ $$ = root->newProduction($symbols$); }
+	| symbols:NamedSymbols action:TOKEN_ACTION
+		{ $$ = root->newProduction($symbols$, $action$, false); }
+	| "epsilon"
+		{ $$ = root->newProduction(); }
+	| "epsilon" action:TOKEN_ACTION
+		{ $$ = root->newProduction($action$, false); }
+	| epsilon
+		{ $$ = root->newProduction(); }
+	| TOKEN_ACTION
+		{ $$ = root->newProduction($1, false); }
+;
+
+production NamedSymbols =
+	symbols:NamedSymbols symbol:NamedSymbol
+		{ $$ = $symbols$; $symbols$->addSymbol($symbol$); }
+	| symbol:NamedSymbol
+		{ $$ = root->newNamedSymbols(); $$->addSymbol($symbol$); }
+;
+
+production NamedSymbol = identifier:Identifier ":" symbol:Symbol
+		{ $$ = root->newNamedSymbol($identifier$, $symbol$); }
+	| symbol:Symbol
+		{ $$ = root->newNamedSymbol($symbol$); }
+;
+
+production Symbol = Identifier
+        { $$ = root->findOrCreateSymbol($1); }
+	| STRING_LITERAL
+        {
+    		ContextFreeGrammar::Symbol* symbol = root->getTerminal($1);
+    		if (symbol == ContextFreeGrammar::getErrorSymbol() || symbol == nullptr)
+    			logger->LogError(new UndefinedTerminalSymbolErrorObject($1->getValue(), lexer->getLineNumber(), lexer->getCharacter()));
+    		$$ = symbol;
+    	}
+    | "$"
+        {
+    		$$ = root->getTerminal(root->newStringLiteral("$"));
+    	}
+;
+
+production Keyword =
+	"grammar"
+	| "term"
+	| "nonterm"
+	| "production"
+	| "start"
+	| "code"
+	| "header"
+	| "baseclass"
+	| "roottype"
+	| "basetype"
+	| "returntype"
+	| "union"
+	| "nonassoc"
+	| "left"
+	| "right"
+	| "epsilon"
+;
+
+production Identifier =
+	Keyword
+	| IDENTIFIER
+;
+
+}
+
+// End g/tools/pg/pg.pg

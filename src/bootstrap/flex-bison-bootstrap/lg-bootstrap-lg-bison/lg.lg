@@ -1,0 +1,352 @@
+//
+//  g/src/bootstrap/flex-bison-bootstrap/lg-bootstrap-lg-bison/lg.lg
+//
+//  Property and Copyright (c) 2015-2022 Aaron Nathaniel Gray
+//
+
+lexer LG {
+	start INITIAL
+	header {
+		#include "g/Logger.h"
+		#include "g/LexicalAnalyserGenerator/Ranges.h"
+		#include "g/LexicalAnalyserGenerator/LexicalGenerator.h"
+		#include "g/LexicalAnalyserGenerator/LexicalMachine.h"
+		#include "g/LexicalAnalyserGenerator/LexicalContext.h"
+		#include "g/LexicalAnalyserGenerator/DFA.h"
+		#include "g/CodeBlock.h"
+		#include "nonstd/Utils.h"
+
+		using namespace G::LexicalAnalyserGenerator;
+		#include "LexicalGenerator.tab.h"
+
+		extern LexicalGenerator*	lexicalGenerator;
+
+		extern std::string action;
+		extern char identifier[132];
+		extern char *yytext;
+		extern int yylloc;
+		extern int curley_braces;
+		extern int yyfnln;
+		enum MODE { NORMAL, CODE_BLOCK };
+
+		extern Runtime::Lexer* lexer;
+
+		//#define yylval	LexicalGenerator_yylval
+		//#define yylex() (lexer->lex())
+	}
+	code {
+		std::string action;
+		char identifier[132];
+		std::string stringLiteral;
+		char *yytext;
+		//int yyfnln;
+		int yylloc = 1;
+		int curley_braces = 0;
+		MODE bracket_mode = NORMAL;
+	}
+
+	baseclass "Runtime::Lexer"
+
+    context INITIAL {
+    	"lexer"				        { return KEYWORD_LEXER; }
+    	/[A-Za-z_][A-Za-z0-9_]*/	{
+										char* id = identifier;
+										for (auto i = begin(); i != _end; ++i, ++id)
+											*id = *i;
+										*id = '\0';
+
+										yylval.Identifier = lexicalGenerator->newIdentifier(identifier);
+										return IDENTIFIER;
+									}
+    	"{"					        { push(LEXER); return OPERATOR_OPEN_CURLY_BRACE; }
+    	"}"					        { std::cerr << "Extra invalid closing brace" << std::endl; return ERROR; }
+		"/*"						{ push(Context::COMMENT); return IGNORE; }
+		"//"						{ push(Context::SINGLE_LINE_COMMENT); return IGNORE; }
+    	/[ \t]+/            		{ return IGNORE; }
+    	/\r?\n/         			{ ++yylloc; return IGNORE; }
+    	/./							{
+    	                                std::cerr << "Invalid chararcter '" << toString(_begin[0])
+    	                                          << "' in outer scope on line " << yylloc << std::endl;
+    	                                return ERROR;
+    	                            }
+    }
+
+	context LEXER {
+    	"context"			        { return KEYWORD_CONTEXT; }
+    	"start"						{ return KEYWORD_START; }
+		"code"						{ bracket_mode = MODE::CODE_BLOCK; return KEYWORD_CODE; }
+		"header"					{ bracket_mode = MODE::CODE_BLOCK; return KEYWORD_HEADER; }
+		"roottype"					{ return KEYWORD_ROOTTYPE; }
+		"baseclass"					{ return KEYWORD_BASECLASS; }
+		"valuetype"					{ return KEYWORD_VALUETYPE; }
+
+		/[A-Za-z_][A-Za-z0-9_]*/	{
+										char* id = identifier;
+										for (auto i = begin(); i != _end; ++i, ++id)
+											*id = *i;
+										*id = '\0';
+
+										yylval.Identifier = lexicalGenerator->newIdentifier(identifier);
+										return IDENTIFIER;
+									}
+		/"/							{
+										push(Context::LEX_STRING_LITERAL);
+										stringLiteral = "";
+										return IGNORE;
+									}
+    	"{"					        {
+									  if (bracket_mode == MODE::NORMAL) {
+										push(CONTEXT);
+									    yyfnln = getLineNumber();
+										return OPERATOR_OPEN_CURLY_BRACE;
+									  }
+									  else {
+										push(CODE);
+										yyfnln = yylloc;
+										curley_braces = 1;
+										action = "";
+										bracket_mode = MODE::NORMAL;
+										return IGNORE;
+									  }
+									}
+    	"}"					        { pop(); return OPERATOR_CLOSE_CURLY_BRACE; }
+		"/*"						{ push(Context::COMMENT); return IGNORE; }
+		"//"						{ push(Context::SINGLE_LINE_COMMENT); return IGNORE; }
+    	/[ \t]+/            		{ return IGNORE; }
+    	/\r?\n/						{ ++yylloc; return IGNORE; }
+    	/./							{
+    	                                std::cerr << "Invalid character '" << toString(_begin[0])
+    	                                          << "' in lexer block on line " << yylloc << std::endl;
+    	                                return ERROR;
+    	                            }
+	}
+
+	context CONTEXT {
+    	"/"					        { push(RE); return IGNORE; }
+    	/\"/				        { push(DOUBLE_QUOTED_STRING); return IGNORE; }
+    	"{"					        { push(ACTION); yyfnln = yylloc; curley_braces = 1; action = _begin[0]; return IGNORE; }
+    	"}"					        { pop(); return OPERATOR_CLOSE_CURLY_BRACE; }
+		"/*"						{ push(Context::COMMENT); return IGNORE; }
+		"//"						{ push(Context::SINGLE_LINE_COMMENT); return IGNORE; }
+    	/[ \t]+/            		{ return IGNORE; }
+    	/\r?\n/		    	        { ++yylloc; return IGNORE; }
+    	/./							{
+    	                                std::cerr << "Invalid character '" << toString(_begin[0])
+    	                                          << "' in context block on line " << yylloc << std::endl;
+    	                                return ERROR;
+    	                            }
+	}
+
+	context RE {
+    	"/"							{ pop(); return IGNORE; }
+    	"["							{ push(CCL); yylval.Symbol = _begin[0]; return OPERATOR_OPEN_BRACE; }
+    	"|"							{ return OPERATOR_OR; }
+    	"*"							{ return OPERATOR_STAR; }
+    	"+"							{ return OPERATOR_PLUS; }
+    	"?"							{ return OPERATOR_QUERY; }
+    	"("							{ return OPERATOR_OPEN_PAREN; }
+    	")"							{ return OPERATOR_CLOSE_PAREN; }
+    	/[A-Za-z0-9]/				{ yylval.Symbol = _begin[0]; return SYMBOL; }
+    	/\\[xX][0-9A-Fa-f]+/		{ yylval.Symbol = (char) strtol(&_begin[2], &_end, 16); return SYMBOL; }
+    	/\\[0-7]+/  				{ yylval.Symbol = (char) strtol(&_begin[2], &_end, 8); return SYMBOL; }
+    	/\\a/    					{ yylval.Symbol = '\a'; return SYMBOL; }
+    	/\\b/    					{ yylval.Symbol = '\b'; return SYMBOL; }
+    	/\\f/    					{ yylval.Symbol = '\f'; return SYMBOL; }
+    	/\\n/    					{ yylval.Symbol = '\n'; return SYMBOL; }
+    	/\\r/    					{ yylval.Symbol = '\r'; return SYMBOL; }
+    	/\\t/    					{ yylval.Symbol = '\t'; return SYMBOL; }
+    	/\\v/    					{ yylval.Symbol = '\v'; return SYMBOL; }
+    	/\\\'/    					{ yylval.Symbol = '\''; return SYMBOL; }
+    	/\\\"/    					{ yylval.Symbol = '\"'; return SYMBOL; }
+    	/\\\?/    					{ yylval.Symbol = '\?'; return SYMBOL; }
+    	/\\\\/    					{ yylval.Symbol = '\\'; return SYMBOL; }
+    	/\\\//    					{ yylval.Symbol = '/'; return SYMBOL; }
+		/\\\]/ 						{ yylval.Symbol = ']'; return SYMBOL; }
+		/\\\-/ 						{ yylval.Symbol = '-'; return SYMBOL; }
+    	/\\./   					{
+    	                                std::cerr << "Invalid escape sequence '\\" << _begin[1]
+    	                                          << "' in regular expression on line " << yylloc << std::endl;
+    	                                return ERROR;
+    	                            }
+    	" "     					{ yylval.Symbol = ' '; return SYMBOL; }
+    	"."                         { return OPERATOR_PERIOD; }
+		/./ 						{ yylval.Symbol = _begin[0]; return SYMBOL; }
+	}
+
+	context CCL {
+    	"]"							{ pop(); return OPERATOR_CLOSE_BRACE; }
+    	"-"							{ return OPERATOR_HYPHEN; }
+    	"^"							{ return OPERATOR_CARET; }
+    	/[^\\\n\]\-]/		        { yylval.Symbol = _begin[0]; return SYMBOL; }
+    	/\\[xX][0-9A-Fa-f]+/		{ yylval.Symbol = (char) strtol(&_begin[2], &_end, 16); return SYMBOL; }
+    	/\\[0-7]+/  				{ yylval.Symbol = (char) strtol(&_begin[2], &_end, 8); return SYMBOL; }
+    	/\\a/    					{ yylval.Symbol = '\a'; return SYMBOL; }
+    	/\\b/    					{ yylval.Symbol = '\b'; return SYMBOL; }
+    	/\\f/    					{ yylval.Symbol = '\f'; return SYMBOL; }
+    	/\\n/    					{ yylval.Symbol = '\n'; return SYMBOL; }
+    	/\\r/    					{ yylval.Symbol = '\r'; return SYMBOL; }
+    	/\\t/    					{ yylval.Symbol = '\t'; return SYMBOL; }
+    	/\\v/    					{ yylval.Symbol = '\v'; return SYMBOL; }
+    	/\\\\/    					{ yylval.Symbol = '\\'; return SYMBOL; }
+    	/\\\'/    					{ yylval.Symbol = '\''; return SYMBOL; }
+    	/\\\"/    					{ yylval.Symbol = '\"'; return SYMBOL; }
+    	/\\\?/    					{ yylval.Symbol = '\?'; return SYMBOL; }
+		/\\\]/ 						{ yylval.Symbol = ']'; return SYMBOL; }
+		/\\\-/ 						{ yylval.Symbol = '-'; return SYMBOL; }
+    	/\\./   					{
+    	                                std::cerr << "Invalid escape sequence '\\" << _begin[0]
+    	                                          << "' in character class on line " << yylloc << std::endl;
+    	                                return ERROR;
+    	                            }
+    	/./ 						{
+    	                                std::cerr << "Invalid chararcter '" << _begin[0]
+    	                                          << "' in character class on line " << yylloc << std::endl;
+    	                                return ERROR;
+    	                            }
+	}
+
+	context DOUBLE_QUOTED_STRING {
+    	/\"/ 						{ pop(); return IGNORE; }
+    	/\\[xX][0-9A-Fa-f]+/		{ yylval.Symbol = (char) strtol(&_begin[2], &_end, 16); return SYMBOL; }
+    	/\\[0-7]+/  				{ yylval.Symbol = (char) strtol(&_begin[2], &_end, 8); return SYMBOL; }
+    	/\\a/    					{ yylval.Symbol = '\a'; return SYMBOL; }
+    	/\\b/    					{ yylval.Symbol = '\b'; return SYMBOL; }
+    	/\\f/    					{ yylval.Symbol = '\f'; return SYMBOL; }
+    	/\\n/    					{ yylval.Symbol = '\n'; return SYMBOL; }
+    	/\\r/    					{ yylval.Symbol = '\r'; return SYMBOL; }
+    	/\\t/    					{ yylval.Symbol = '\t'; return SYMBOL; }
+    	/\\v/    					{ yylval.Symbol = '\v'; return SYMBOL; }
+    	/\\\\/    					{ yylval.Symbol = '\\'; return SYMBOL; }
+    	/\\'/    					{ yylval.Symbol = '\''; return SYMBOL; }
+    	/\\"/  						{ yylval.Symbol = '"'; return SYMBOL; }
+    	/\\\?/    					{ yylval.Symbol = '?'; return SYMBOL; }
+    	/\\./   					{
+    	                                std::cerr << "Invalid escape sequence '\\" << _begin[1]
+    	                                          << "' in quoted string on line " << yylloc << std::endl;
+    	                                return ERROR;
+    	                            }
+    	/./							{ yylval.Symbol = _begin[0]; return SYMBOL; }
+	}
+
+	context LEX_STRING_LITERAL {
+    	/\"/ 						{
+										yylval.StringLiteral = stringLiteral.c_str();
+										pop();
+										return STRING_LITERAL;
+									}
+    	/./							{
+										stringLiteral += *begin();
+										return IGNORE;
+									}
+    }
+
+	context ACTION {
+    	"{"		    	            				{ action += _begin[0]; ++curley_braces; return IGNORE; }
+    	"}"              							{
+                    									action += "}";
+                    									if (--curley_braces == 0) {
+                    										pop();
+                    										yylval.Action = action.c_str();
+                    										return TOKEN_ACTION;
+                    									}
+                    									return IGNORE;
+                    								}
+    	/\"/						                { push(ACTION_DOUBLE_QUOTED_STRING); action += "\""; return IGNORE; }
+    	/\'(\\([0-7]+|[xX][0-9A-Fa-f]+|[^\n]))\'/	{
+													  for (auto i = begin(); i != end(); ++i)
+														action += *i;
+													  return IGNORE;
+													}
+    	/\'.\'/						                {
+													  for (auto i = begin(); i != end(); ++i)
+														action += *i;
+													  return IGNORE;
+													}
+    	/\r?\n/						                {
+													  ++yylloc;
+													  action += '\n';
+													  return IGNORE;
+													}
+    	/./							                { action += _begin[0]; return IGNORE; }
+	}
+
+	context CODE {
+    	"{"		    	            				{ action += _begin[0]; ++curley_braces; return IGNORE; }
+    	"}"              							{
+                    									if (--curley_braces == 0) {
+                    										pop();
+                    										yylval.CodeBlock = new CodeBlock(action, yyfnln, filename);
+                    										return TOKEN_CODE;
+                    									}
+														else {
+	                    									action += "}";
+		                									return IGNORE;
+														}
+                    								}
+    	/\"/						                { push(ACTION_DOUBLE_QUOTED_STRING); action += "\""; return IGNORE; }
+    	/\'(\\([0-7]+|[xX][0-9A-Fa-f]+|[^\n]))\'/	{
+													  for (auto i = begin(); i != end(); ++i)
+														action += *i;
+													  return IGNORE;
+													}
+    	/\'.\'/						                {
+													  for (auto i = begin(); i != end(); ++i)
+														action += *i;
+													  return IGNORE;
+													}
+    	/\r?\n/						                {
+													  ++yylloc;
+													  action += '\n';
+													  return IGNORE;
+													}
+    	/./							                { action += _begin[0]; return IGNORE; }
+	}
+
+	context ACTION_DOUBLE_QUOTED_STRING {
+		/"/								{ action += _begin[0]; pop(); return IGNORE; }
+		/\\/							{ action += _begin[0]; push(ACTION_DOUBLE_QUOTED_STRING_ESCAPE_SEQUENCE); return IGNORE; }
+		/./								{ action += _begin[0]; return IGNORE; }
+	}
+
+	context ACTION_DOUBLE_QUOTED_STRING_ESCAPE_SEQUENCE {
+    	/[xX][0-9A-Fa-f]+/			{
+									  for (auto i = begin(); i != end(); ++i)
+										action += *i;
+									  pop();
+									  return IGNORE;
+									}
+    	/[0-7]+/  					{
+									  for (auto i = begin(); i != end(); ++i)
+										action += *i;
+									  pop();
+									  return IGNORE;
+									}
+    	/a/    						{ action += _begin[0]; pop(); return IGNORE; }
+    	/b/    						{ action += _begin[0]; pop(); return IGNORE; }
+    	/f/    						{ action += _begin[0]; pop(); return IGNORE; }
+    	/n/    						{ action += _begin[0]; pop(); return IGNORE; }
+    	/r/    						{ action += _begin[0]; pop(); return IGNORE; }
+    	/t/    						{ action += _begin[0]; pop(); return IGNORE; }
+    	/v/    						{ action += _begin[0]; pop(); return IGNORE; }
+    	/\\/    					{ action += _begin[0]; pop(); return IGNORE; }
+    	/'/    						{ action += _begin[0]; pop(); return IGNORE; }
+    	/"/  						{ action += _begin[0]; pop(); return IGNORE; }
+    	/\?/    					{ action += _begin[0]; pop(); return IGNORE; }
+    	/./   						{
+    	                                std::cerr << "Invalid escape sequence '\\" << _begin[0]
+    	                                          << "' in quoted string on line " << yylloc << std::endl;
+										action += _begin[0];
+										pop();
+    	                                return ERROR;
+    	                            }
+	}
+	context COMMENT {
+		"*/"						{ pop(); return IGNORE; }
+		/\r?\n/						{ ++yylloc; return IGNORE; }
+		/./							{ return IGNORE;}
+	}
+	context SINGLE_LINE_COMMENT {
+		/\r?\n+/					{ ++yylloc; pop(); return IGNORE; }
+		/./							{ return IGNORE; }
+	}
+}

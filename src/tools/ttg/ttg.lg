@@ -1,0 +1,316 @@
+//
+//	g/src/tools/ttg/ttg.lg
+//
+//  Property and Copyright (c) 2022 Aaron Nathaniel Gray
+//
+
+lexer TTG {
+	start INITIAL
+	header {
+		#include <string>
+		#include <map>			// TODO: needs to be in generated lexer - used for Context names.
+		#include "nonstd/Utils.h"
+		#include "ttg.pg.h"
+
+		extern std::string _code;
+		extern char identifier[132];
+		extern char *yytext;
+		extern int curley_braces;
+		extern int yyfnln;
+		enum MODE { NORMAL, CODE_BLOCK };
+	}
+	code {
+		std::string _code;
+		char identifier[132];
+		std::string stringLiteral;
+		int yylloc = 1;
+		int yyfnln;
+		int curley_braces = 0;
+		int double_curley_braces = 0;
+		bool inaction = false;
+		MODE bracket_mode = MODE::NORMAL;
+
+		using namespace Runtime;
+	}
+
+	baseclass "Lexer"
+	roottype "TextualTemplate"
+	valuetype "ValueType"
+
+    context INITIAL {
+    	"module"				    {
+										std::cout << "module ";
+										return ttgParser::KEYWORD_MODULE;
+									}
+    	/[A-Za-z_][A-Za-z0-9_]*/	{
+										char* id = identifier;
+										for (auto i = begin(); i != _end; ++i, ++id)
+											*id = *i;
+										*id = '\0';
+										currentValue.Identifier = root->newIdentifier(identifier);
+										std::cout << "IDENTIFIER(\"" << identifier << "\")";
+										return ttgParser::IDENTIFIER;
+									}
+    	"{"					        {
+										std::cout << " '{' ";
+										push(MODULE); return ttgParser::OPERATOR_OPEN_CURLY_BRACE;
+									}
+    	"}"					        { std::cerr << "Extra invalid closing brace" << std::endl; return ERROR; }
+		"/*"						{ push(Context::COMMENT); return IGNORE; }
+		"//"						{ push(Context::SINGLE_LINE_COMMENT); return IGNORE; }
+    	/[ \t]+/            		{ return IGNORE; }
+    	/\r?\n+/         			{ newLine(); return IGNORE; }
+    	/./							{
+    	                                std::cerr << "Invalid chararcter '" << toString(_begin[0])
+    	                                          << "' in outer scope on line " << getLineNumber() << std::endl;
+    	                                return ERROR;
+    	                            }
+    }
+
+	context MODULE {
+		"code"						{ bracket_mode = MODE::CODE_BLOCK; return ttgParser::KEYWORD_CODE; }
+		"header"					{ bracket_mode = MODE::CODE_BLOCK; return ttgParser::KEYWORD_HEADER; }
+
+    	"template"			        {
+										std::cout << "template ";
+										return ttgParser::KEYWORD_TEMPLATE;
+									}
+    	"class"			            { return ttgParser::KEYWORD_CLASS; }
+    	"function"			        {
+										std::cout << "function ";
+										return ttgParser::KEYWORD_FUNCTION;
+									}
+    	"method"			        { return ttgParser::KEYWORD_METHOD; }
+
+		/[A-Za-z_][A-Za-z0-9_]*/	{
+										char* id = identifier;
+										for (auto i = begin(); i != _end; ++i, ++id)
+											*id = *i;
+										*id = '\0';
+										currentValue.Identifier = root->newIdentifier(identifier);
+										std::cout << "IDENTIFIER(\"" << identifier << "\")";
+										return ttgParser::IDENTIFIER;
+									}
+    	"::"						{
+										std::cout << " :: ";
+										return ttgParser::OPERATOR_DOUBLE_COLON;
+									}
+		"{"				            {
+										std::cout << " '{' ";
+										push(CODE);
+										yyfnln = getLineNumber();
+										curley_braces = 0;
+										_code = "";
+										return ttgParser::OPERATOR_OPEN_CURLY_BRACE;
+									}
+    	"}"					        {
+										std::cout << " '}' ";
+										pop(); return ttgParser::OPERATOR_CLOSE_CURLY_BRACE;
+									}
+    	"("							{
+										std::cout << " '(' ";
+										return ttgParser::OPERATOR_OPEN_PARENTHSIS;
+									}
+    	")"							{
+										std::cout << " ')' ";
+										return ttgParser::OPERATOR_CLOSE_PARENTHSIS;
+									}
+    	";"							{
+										std::cout << " ';' ";
+										return ttgParser::OPERATOR_SEMICOLON;
+									}
+		"/*"						{ push(Context::COMMENT); return IGNORE; }
+		"//"						{ push(Context::SINGLE_LINE_COMMENT); return IGNORE; }
+    	/[ \t]+/            		{ return IGNORE; }
+    	/\r?\n/			            { newLine(); return IGNORE; }
+    	/./							{
+    	                                std::cerr << "Invalid character '" << toString(_begin[0])
+    	                                          << "' in lexer block on line " << getLineNumber() << std::endl;
+    	                                return ERROR;
+    	                            }
+	}
+
+	context CODE {
+    	"{"		    	            				{
+														std::cout << " '{' ";
+														_code += _begin[0]; ++curley_braces; return IGNORE; }
+    	"}"              							{
+														std::cout << " '}'(" << curley_braces << ") ";
+                    									if (curley_braces-- == 0) {
+															std::cout << " (curley_braces == 0) ";
+                    										pop();
+                    										return ttgParser::OPERATOR_CLOSE_CURLY_BRACE;
+                    									}
+														else {
+	                    									_code += "}";
+		                									return IGNORE;
+														}
+                    								}
+    	"{{"										{
+														push(Context::ACTIONCODE);
+														_code = "";
+														return IGNORE;
+													}
+		"(("										{
+														push(Context::PARAMETER);
+														currentValue.Code = root->newCodeBlock(_code);
+														_code = "";
+														return ttgParser::TOKEN_CODE;
+													}
+    	/\"/						                { push(ACTION_DOUBLE_QUOTED_STRING); _code += "\""; return IGNORE; }
+    	/\'(\\([0-7]+|[xX][0-9A-Fa-f]+|[^\n]))\'/	{
+													    for (auto i = begin(); i != end(); ++i)
+														    _code += *i;
+													    return IGNORE;
+													}
+    	/\'.\'/						                {
+													    for (auto i = begin(); i != end(); ++i)
+														    _code += *i;
+													    return IGNORE;
+													}
+    	/\r?\n\r?\n/				                {
+													    yylloc += 2;
+														if (nonstd::trimmed(_code) != "") {
+                   											currentValue.Code = root->newCodeBlock(_code);
+															_code = "";
+			           										return ttgParser::TOKEN_CODE;
+														}
+														else
+															return IGNORE;
+													}
+    	/\r?\n/						                {
+													    ++yylloc;
+														if (nonstd::trimmed(_code) != "") {
+	                   										currentValue.Code = root->newCodeBlock(_code);
+														    _code = "";
+			           										return ttgParser::TOKEN_CODE;
+														}
+														else
+															return IGNORE;
+													}
+    	/./							                {
+														std::cout << "CHARACTER(" << toString(_begin[0]) << ") ";
+														_code += _begin[0];
+                   										return IGNORE;
+													}
+	}
+
+	context PARAMETER {
+	    "))"                        {
+										pop();
+										currentValue.Code = root->newCodeBlock(_code);
+										_code = "";
+	                                    return ttgParser::TOKEN_PARAMETER;
+	                                }
+    	/./							{ _code += _begin[0]; return IGNORE; }
+		"/*"						{ push(Context::COMMENT); return IGNORE; }
+    	/\r?\n/		    	        { return IGNORE; }
+	}
+
+	context ACTIONCODE {
+    	"}}"				                        {
+										                pop();
+														currentValue.Code = root->newCodeBlock(_code);
+														_code = "";
+										                return ttgParser::TOKEN_ACTIONCODE;
+										            }
+    	"{"		    	            				{ _code += "{"; return IGNORE; }
+    	"}"              							{ _code += "}"; return IGNORE; }
+    	/\"/						                { push(ACTION_DOUBLE_QUOTED_STRING); _code += "\""; return IGNORE; }
+    	/\'(\\([0-7]+|[xX][0-9A-Fa-f]+|[^\n]))\'/	{
+													    for (auto i = begin(); i != end(); ++i)
+														    _code += *i;
+													    return IGNORE;
+													}
+    	/\'.\'/						                {
+													    for (auto i = begin(); i != end(); ++i)
+														    _code += *i;
+													    return IGNORE;
+													}
+    	/\r?\n/						                {
+													    newLine();
+													    _code += '\n';
+													    return IGNORE;
+													}
+    	/./							                { _code += _begin[0]; return IGNORE; }
+	}
+
+	context LEX_STRING_LITERAL {
+    	/\"/ 						{
+										currentValue.StringLiteral = root->newStringLiteral(stringLiteral);
+										pop();
+										return ttgParser::STRING_LITERAL;
+									}
+    	/./							{
+										stringLiteral += *begin();
+										return IGNORE;
+									}
+    }
+
+	context ACTION_DOUBLE_QUOTED_STRING {
+		/"/								{ _code += _begin[0]; pop(); return IGNORE; }
+		/\\/							{ _code += _begin[0]; push(ACTION_DOUBLE_QUOTED_STRING_ESCAPE_SEQUENCE); return IGNORE; }
+		/./								{ _code += _begin[0]; return IGNORE; }
+	}
+
+	context ACTION_DOUBLE_QUOTED_STRING_ESCAPE_SEQUENCE {
+    	/[xX][0-9A-Fa-f]+/			{
+									  for (auto i = begin(); i != end(); ++i)
+										_code += *i;
+									  pop();
+									  return IGNORE;
+									}
+    	/[0-7]+/  					{
+									  for (auto i = begin(); i != end(); ++i)
+										_code += *i;
+									  pop();
+									  return IGNORE;
+									}
+    	/a/    						{ _code += _begin[0]; pop(); return IGNORE; }
+    	/b/    						{ _code += _begin[0]; pop(); return IGNORE; }
+    	/f/    						{ _code += _begin[0]; pop(); return IGNORE; }
+    	/n/    						{ _code += _begin[0]; pop(); return IGNORE; }
+    	/r/    						{ _code += _begin[0]; pop(); return IGNORE; }
+    	/t/    						{ _code += _begin[0]; pop(); return IGNORE; }
+    	/v/    						{ _code += _begin[0]; pop(); return IGNORE; }
+    	/\\/    					{ _code += _begin[0]; pop(); return IGNORE; }
+    	/'/    						{ _code += _begin[0]; pop(); return IGNORE; }
+    	/"/  						{ _code += _begin[0]; pop(); return IGNORE; }
+    	/\?/    					{ _code += _begin[0]; pop(); return IGNORE; }
+    	/./   						{
+    	                                std::cerr << "Invalid escape sequence '\\" << _begin[0]
+    	                                          << "' in quoted string on line " << getLineNumber() << std::endl;
+										_code += _begin[0];
+										pop();
+    	                                return ERROR;
+    	                            }
+	}
+	context STRING_LITERAL {
+    	/\"/ 						{
+										currentValue.StringLiteral = root->newStringLiteral(stringLiteral);
+										pop();
+										return ttgParser::STRING_LITERAL;
+									}
+		"(("						{
+									    push(Context::PARAMETER);
+										currentValue.Code = root->newCodeBlock(_code);
+										_code = "";
+										return ttgParser::TOKEN_CODE;
+		                            }
+    	/./							{
+										stringLiteral += *begin();
+										return IGNORE;
+									}
+    }
+	context COMMENT {
+		"*/"						{ pop(); return IGNORE; }
+		/\r?\n/						{ newLine(); return IGNORE; }
+		/./							{ return IGNORE;}
+	}
+	context SINGLE_LINE_COMMENT {
+		/\r?\n/						{ newLine(); pop(); return IGNORE; }
+		/./							{ return IGNORE; }
+	}
+}
+
+// End g/src/tools/ttg/ttg.lg

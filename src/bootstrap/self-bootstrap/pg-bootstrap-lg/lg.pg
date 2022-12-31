@@ -1,0 +1,262 @@
+//
+//	g/bootstrap/self-bootstrap/pg-bootstrap-lg/lg.pg
+//
+//  Property and Copyright (c) 2022 Aaron Nathaniel Gray
+//
+
+grammar lg "LR(1)" {
+
+header {
+	#include <io.h>
+	#include <stdlib.h>
+	#include <iostream>
+
+	#include "g/Logger.h"
+	#include "g/LexicalAnalyserGenerator/Ranges.h"
+	#include "g/LexicalAnalyserGenerator/LexicalGenerator.h"
+	#include "g/LexicalAnalyserGenerator/LexicalMachine.h"
+	#include "g/LexicalAnalyserGenerator/LexicalContext.h"
+	#include "g/LexicalAnalyserGenerator/DFA.h"
+	#include "g/LexicalAnalyserGenerator/RegularGrammar.h"
+	#include "g/CodeBlock.h"
+
+	using namespace G::LexicalAnalyserGenerator;
+
+	extern LexicalGenerator*	lexicalGenerator;
+
+	union ValueType {
+    	LexicalMachine* Machine;
+    	LexicalContext* Context;
+    	RegularGrammar::RE* RegularGrammar;
+    	RegularGrammar::RE* Node;
+    	int Operator;
+    	char Symbol;
+    	const char* String;
+    	LexicalMachine::Identifier* Identifier;
+    	Ranges* ranges;
+		CodeBlock* CodeBlock;
+    	const char* StringLiteral;
+    	const char* Action;				// TODO: Promote to Action and Code classes/objects !
+	};
+
+	//extern int yylloc;
+	extern int yyfnln;
+	extern ValueType currentValue;
+
+	using namespace Runtime;
+};
+
+code {
+	ValueType currentValue;
+
+	Ranges newline = {Char('\n'), Char('\r')};
+};
+code {
+    void lgParser::reportError(State state, Input input) {
+        std::string report = std::string("Found ") + getTerminalName(input) + " Expecting ";
+
+        Pair<Action>* pair = ShiftReduce_states[state - 1]->pair;
+        if (pair) {
+            for (size_t pairs = ShiftReduce_states[state - 1]->pairs; pairs > 0; --pairs) {
+                report += getTerminalName(pair->input) + ((pairs > 1) ? ", " : "");
+                ++pair;
+            }
+        }
+        else
+            report += std::string("<nothing>");
+        report += std::string(" in state ") + std::to_string(state) + ".\n";
+
+        logger->LogError(new SyntaxErrorObject(report, lexer->getLineNumber(), lexer->getCharacter()));
+    }
+};
+roottype "RegularGrammar";
+basetype union "ValueType";
+
+nonterm File;
+nonterm Footer;
+nonterm BlankLines;
+nonterm Lexer;
+nonterm HeadersOpt;
+nonterm Headers;
+nonterm Header;
+nonterm ContextsOpt : Machine;
+nonterm Contexts : Machine;
+nonterm Context : Context;
+nonterm RegularGrammar : RegularGrammar;
+nonterm Productions : Node;
+nonterm Production : Node;
+nonterm RegularExpression : Node;
+nonterm Selection : Node;
+nonterm Sequence : Node;
+nonterm Repetition : Node;
+nonterm Factor : Node;
+nonterm CharacterClass : ranges;
+
+term KEYWORD_LEXER		"lexer";
+term KEYWORD_START		"start";
+term KEYWORD_MACHINE	"machine";
+term KEYWORD_CODE		"code";
+term KEYWORD_HEADER		"header";
+term KEYWORD_CONTEXT	"context";
+
+term KEYWORD_BASECLASS	"baseclass";
+term KEYWORD_ROOTTYPE	"roottype";
+term KEYWORD_VALUETYPE	"valuetype";
+term KEYWORD_RETURNTYPE	"returntype";
+
+term IDENTIFIER : Identifier;
+term STRING : String;
+term STRING_LITERAL : StringLiteral;
+
+term OPERATOR_OR : Operator                 "|";
+term OPERATOR_STAR : Operator				"*";
+term OPERATOR_PLUS : Operator				"+";
+term OPERATOR_QUERY : Operator				"?";
+term OPERATOR_OPEN_PAREN : Operator			"(";
+term OPERATOR_CLOSE_PAREN : Operator		")";
+term OPERATOR_OPEN_BRACE : Operator			"[";
+term OPERATOR_CLOSE_BRACE : Operator		"]";
+term OPERATOR_OPEN_CURLY_BRACE : Operator	"{";
+term OPERATOR_CLOSE_CURLY_BRACE : Operator  "}";
+
+term OPERATOR_HYPHEN : Operator				"-";
+term OPERATOR_CARET : Operator				"^";
+term OPERATOR_PERIOD : Operator				".";
+
+term SYMBOL : Symbol;
+term TOKEN_ACTION : Action;
+term TOKEN_CODE : CodeBlock;
+term WHITESPACE;
+term NEWLINE;
+
+start File;
+
+production File = Lexer Footer;
+
+production Footer = BlankLines;
+
+production BlankLines = BlankLines NEWLINE | /* epsilon */
+;
+
+production Lexer = "lexer" name:IDENTIFIER "{" HeadersOpt machine:ContextsOpt "}"
+	{ $machine$->setName(*$name$); }
+;
+
+production HeadersOpt = Headers
+	| epsilon
+;
+
+production Headers = Headers Header
+	| Header
+;
+
+production Header =
+	"header" TOKEN_CODE
+		{ lexicalGenerator->addHeader($2); }
+	| "code" TOKEN_CODE
+		{ lexicalGenerator->addCode($2); }
+	| "baseclass" STRING_LITERAL
+		{ lexicalGenerator->setBaseClass($2); }
+	| "roottype" STRING_LITERAL
+		{ lexicalGenerator->setRootType($2); }
+	| "valuetype" STRING_LITERAL
+		{ lexicalGenerator->setValueType($2); }
+	| "returntype" STRING_LITERAL
+		{ lexicalGenerator->setReturnType($2); }
+	| "start" IDENTIFIER
+		{ lexicalGenerator->setStartContext(*$2); }
+;
+
+production ContextsOpt =
+	Contexts
+		{ $$ = $1; }
+	| epsilon
+		{ $$ = lexicalGenerator->getMachine(); }
+;
+
+production Contexts =
+	Contexts Context
+		{ $$ = $1;  $$->addContext($2); }
+	| Context
+		{ $$ = lexicalGenerator->getMachine(); $$->addContext($1); }
+;
+
+production Context =
+	"context" IDENTIFIER "{" RegularGrammar "}"
+		{ $$ = lexicalGenerator->newContext(*$2, lexicalGenerator->newRegularGrammar($4)); }
+;
+
+production RegularGrammar =
+	Productions
+		{ $$ = $1; }
+	| epsilon
+		{ $$ = nullptr; }
+;
+
+production Productions =
+	Productions Production
+		{ $$ = RegularGrammar::newSelection($1, $2); }
+	| Production
+		{ $$ = $1; }
+;
+
+production Production =
+	RegularExpression TOKEN_ACTION
+		{ $$ = RegularGrammar::newSequence($1, RegularGrammar::newEnd(lexicalGenerator->addAction($2, yyfnln)->getIndex())); }
+	| STRING TOKEN_ACTION
+		{ $$ = RegularGrammar::newEnd(lexicalGenerator->addAction($2, yyfnln)->getIndex()); }
+;
+
+production RegularExpression = Selection
+		{ $$ = $1; }
+;
+
+production Selection =
+	Selection "|" Sequence
+		{ $$ = RegularGrammar::newSelection($1, $3); }
+	| Sequence
+		{ $$ = $1; }
+;
+
+production Sequence =
+	Sequence Repetition
+		{ $$ = RegularGrammar::newSequence($1, $2); }
+	| Repetition
+		{ $$ = $1; }
+;
+
+production Repetition = Factor
+		{ $$ = $1; }
+	| Factor "*"
+		{ $$ = RegularGrammar::newKleene($1); }
+	| Factor "+"
+		{ $$ = RegularGrammar::newSequence($1, RegularGrammar::newKleene($1->clone())); }
+	| Factor "?"
+		{ $$ = RegularGrammar::newOptional($1); }
+;
+
+production Factor =
+	SYMBOL
+		{ $$ = RegularGrammar::newCharacterClass(CharacterClass($1)); }
+	| "[" CharacterClass "]"
+		{ $$ = RegularGrammar::newCharacterClass(CharacterClass($2)); }
+	| "[" "^" CharacterClass "]"
+		{ $$ = RegularGrammar::newCharacterClass(CharacterClass($3, true)); }
+	| "(" Selection ")"
+		{ $$ = $2; }
+	| OPERATOR_PERIOD
+		{ $$ = RegularGrammar::newCharacterClass(CharacterClass(newline, true)); }
+;
+
+production CharacterClass =
+	CharacterClass SYMBOL "-" SYMBOL
+		{ $1->add(Range($2,$4)); $$ = $1; }
+	| CharacterClass SYMBOL
+		{ $1->add(Char($2)); $$ = $1; }
+	| epsilon
+		{ $$ = new Ranges(); }
+;
+
+}
+
+// End g/bootstrap/self-bootstrap/pg-bootstrap-lg/lg.pg

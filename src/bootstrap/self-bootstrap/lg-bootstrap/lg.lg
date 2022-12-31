@@ -1,0 +1,339 @@
+//
+//	g/src/bootstrap/self-bootstrap/lg-bootstrap/lg.lg
+//
+//  Property and Copyright (c) 2017-2022 Aaron Nathaniel Gray
+//
+
+lexer lg {
+	start INITIAL
+	header {
+		#include <string>
+		#include "lg.pg.h"
+		#include "nonstd/Utils.h"
+
+		enum MODE { NORMAL, CODE_BLOCK };
+	}
+	code {
+		std::string action;
+		char identifier[132];
+		std::string stringLiteral;
+		int yyfnln;
+		int curley_braces = 0;
+		MODE bracket_mode = NORMAL;
+
+		extern LexicalGenerator*	lexicalGenerator;
+
+		using namespace Runtime;
+	}
+
+	roottype "RegularGrammar"
+	baseclass "Lexer"
+	valuetype "ValueType"
+
+    context INITIAL {
+    	"lexer"				        { return lgParser::KEYWORD_LEXER; }
+    	/[A-Za-z_][A-Za-z0-9_]*/	{
+										currentValue.Identifier = lexicalGenerator->newIdentifier(std::string(begin(), end() - begin()));
+										return lgParser::IDENTIFIER;
+									}
+    	"{"					        { push(Context::LEXER); return lgParser::OPERATOR_OPEN_CURLY_BRACE; }
+    	"}"					        { std::cerr << "Extra invalid closing brace" << std::endl; return ERROR; }
+		"/*"						{ push(Context::COMMENT); return IGNORE; }
+		"//"						{ push(Context::SINGLE_LINE_COMMENT); return IGNORE; }
+    	/[ \t]+/            		{ return IGNORE; }
+    	/\r?\n/	         			{ newLine(); return IGNORE; }
+    	/./							{
+    	                                std::cerr << "Invalid chararcter '" << toString(*begin())
+    	                                          << "' in outer scope on line " << getLineNumber() << std::endl;
+    	                                return ERROR;
+    	                            }
+    }
+
+	context LEXER {
+    	"context"			        { return lgParser::KEYWORD_CONTEXT; }
+    	"start"						{ return lgParser::KEYWORD_START; }
+		"code"						{ bracket_mode = MODE::CODE_BLOCK; return lgParser::KEYWORD_CODE; }
+		"header"					{ bracket_mode = MODE::CODE_BLOCK; return lgParser::KEYWORD_HEADER; }
+		"baseclass"					{ return lgParser::KEYWORD_BASECLASS; }
+		"roottype"					{ return lgParser::KEYWORD_ROOTTYPE; }
+		"valuetype"					{ return lgParser::KEYWORD_VALUETYPE; }
+		"returntype"				{ return lgParser::KEYWORD_RETURNTYPE; }
+
+		/[A-Za-z_][A-Za-z0-9_]*/	{
+										currentValue.Identifier = lexicalGenerator->newIdentifier(std::string(begin(), end() - begin()));
+										return lgParser::IDENTIFIER;
+									}
+		/"/							{
+										push(Context::LEX_STRING_LITERAL);
+										stringLiteral = "";
+										return IGNORE;
+									}
+    	"{"					        {
+									  if (bracket_mode == MODE::NORMAL) {
+										push(Context::CONTEXT);
+									    yyfnln = getLineNumber();
+										return lgParser::OPERATOR_OPEN_CURLY_BRACE;
+									  }
+									  else {
+										push(Context::CODE);
+										curley_braces = 1;
+										action = "";
+										bracket_mode = MODE::NORMAL;
+										yyfnln = getLineNumber();
+										return IGNORE;
+									  }
+									}
+    	"}"					        { pop(); return lgParser::OPERATOR_CLOSE_CURLY_BRACE; }
+		"/*"						{ push(Context::COMMENT); return IGNORE; }
+		"//"						{ push(Context::SINGLE_LINE_COMMENT); return IGNORE; }
+    	/[ \t]+/            		{ return IGNORE; }
+    	/\r?\n/			            { newLine(); return IGNORE; }
+    	/./							{
+    	                                std::cerr << "Invalid character '" << toString(*begin())
+    	                                          << "' in lexer block on line " << getLineNumber() << std::endl;
+    	                                return ERROR;
+    	                            }
+	}
+
+	context CONTEXT {
+    	"/"					        { push(Context::RE); return IGNORE; }
+    	/\"/				        { push(Context::DOUBLE_QUOTED_STRING); return IGNORE; }
+    	"{"					        { push(Context::ACTION); yyfnln = getLineNumber(); curley_braces = 1; action = _begin[0]; return IGNORE; }
+    	"}"					        { pop(); return lgParser::OPERATOR_CLOSE_CURLY_BRACE; }
+		"/*"						{ push(Context::COMMENT); return IGNORE; }
+		"//"						{ push(Context::SINGLE_LINE_COMMENT); return IGNORE; }
+    	/[ \t]+/            		{ return IGNORE; }
+    	/\r?\n/		    	        { newLine(); return IGNORE; }
+    	/./							{
+    	                                std::cerr << "Invalid character '" << toString(*begin())
+    	                                          << "' in context block on line " << getLineNumber() << std::endl;
+    	                                return ERROR;
+    	                            }
+	}
+
+	context RE {
+    	"/"							{ pop(); return IGNORE; }
+    	"["							{ push(Context::CCL); currentValue.Symbol = *begin(); return lgParser::OPERATOR_OPEN_BRACE; }
+    	"|"							{ return lgParser::OPERATOR_OR; }
+    	"*"							{ return lgParser::OPERATOR_STAR; }
+    	"+"							{ return lgParser::OPERATOR_PLUS; }
+    	"?"							{ return lgParser::OPERATOR_QUERY; }
+    	"("							{ return lgParser::OPERATOR_OPEN_PAREN; }
+    	")"							{ return lgParser::OPERATOR_CLOSE_PAREN; }
+    	/[A-Za-z0-9]/				{ currentValue.Symbol = *begin(); return lgParser::SYMBOL; }
+    	/\\[xX][0-9A-Fa-f]+/		{ currentValue.Symbol = (char) strtol(&_begin[2], &_end, 16); return lgParser::SYMBOL; }
+    	/\\[0-7]+/  				{ currentValue.Symbol = (char) strtol(&_begin[2], &_end, 8); return lgParser::SYMBOL; }
+    	/\\a/    					{ currentValue.Symbol = '\a'; return lgParser::SYMBOL; }
+    	/\\b/    					{ currentValue.Symbol = '\b'; return lgParser::SYMBOL; }
+    	/\\f/    					{ currentValue.Symbol = '\f'; return lgParser::SYMBOL; }
+    	/\\n/    					{ currentValue.Symbol = '\n'; return lgParser::SYMBOL; }
+    	/\\r/    					{ currentValue.Symbol = '\r'; return lgParser::SYMBOL; }
+    	/\\t/    					{ currentValue.Symbol = '\t'; return lgParser::SYMBOL; }
+    	/\\v/    					{ currentValue.Symbol = '\v'; return lgParser::SYMBOL; }
+    	/\\\'/    					{ currentValue.Symbol = '\''; return lgParser::SYMBOL; }
+    	/\\\"/    					{ currentValue.Symbol = '"'; return lgParser::SYMBOL; }
+    	/\\\?/    					{ currentValue.Symbol = '\?'; return lgParser::SYMBOL; }
+    	/\\\\/    					{ currentValue.Symbol = '\\'; return lgParser::SYMBOL; }
+    	/\\\//    					{ currentValue.Symbol = '/'; return lgParser::SYMBOL; }
+		/\\\]/ 						{ currentValue.Symbol = ']'; return lgParser::SYMBOL; }
+		/\\\-/ 						{ currentValue.Symbol = '-'; return lgParser::SYMBOL; }
+    	/\\./   					{
+    	                                std::cerr << "Invalid escape sequence '\\" << _begin[1]
+    	                                          << "' in regular expression on line " << getLineNumber() << std::endl;
+    	                                return ERROR;
+    	                            }
+    	" "     					{ currentValue.Symbol = ' '; return lgParser::SYMBOL; }
+    	"."                         { return lgParser::OPERATOR_PERIOD; }
+		/./ 						{ currentValue.Symbol = *begin(); return lgParser::SYMBOL; }
+	}
+
+	context CCL {
+    	"]"							{ pop(); return lgParser::OPERATOR_CLOSE_BRACE; }
+    	"-"							{ return lgParser::OPERATOR_HYPHEN; }
+    	"^"							{ return lgParser::OPERATOR_CARET; }
+    	/[^\\\n\]\-]/		        { currentValue.Symbol = *begin(); return lgParser::SYMBOL; }
+    	/\\[xX][0-9A-Fa-f]+/		{ currentValue.Symbol = (char) strtol(&_begin[2], &_end, 16); return lgParser::SYMBOL; }
+    	/\\[0-7]+/  				{ currentValue.Symbol = (char) strtol(&_begin[2], &_end, 8); return lgParser::SYMBOL; }
+    	/\\a/    					{ currentValue.Symbol = '\a'; return lgParser::SYMBOL; }
+    	/\\b/    					{ currentValue.Symbol = '\b'; return lgParser::SYMBOL; }
+    	/\\f/    					{ currentValue.Symbol = '\f'; return lgParser::SYMBOL; }
+    	/\\n/    					{ currentValue.Symbol = '\n'; return lgParser::SYMBOL; }
+    	/\\r/    					{ currentValue.Symbol = '\r'; return lgParser::SYMBOL; }
+    	/\\t/    					{ currentValue.Symbol = '\t'; return lgParser::SYMBOL; }
+    	/\\v/    					{ currentValue.Symbol = '\v'; return lgParser::SYMBOL; }
+    	/\\\\/    					{ currentValue.Symbol = '\\'; return lgParser::SYMBOL; }
+    	/\\\'/    					{ currentValue.Symbol = '\''; return lgParser::SYMBOL; }
+    	/\\\"/    					{ currentValue.Symbol = '"'; return lgParser::SYMBOL; }
+    	/\\\?/    					{ currentValue.Symbol = '\?'; return lgParser::SYMBOL; }
+		/\\\]/ 						{ currentValue.Symbol = ']'; return lgParser::SYMBOL; }
+		/\\\-/ 						{ currentValue.Symbol = '-'; return lgParser::SYMBOL; }
+    	/\\./   					{
+    	                                std::cerr << "Invalid escape sequence '\\" << *begin()
+    	                                          << "' in character class on line " << getLineNumber() << std::endl;
+    	                                return ERROR;
+    	                            }
+    	/./ 						{
+    	                                std::cerr << "Invalid chararcter '" << *begin()
+    	                                          << "' in character class on line " << getLineNumber() << std::endl;
+    	                                return ERROR;
+    	                            }
+	}
+
+	context DOUBLE_QUOTED_STRING {
+    	/\"/ 						{ pop(); return IGNORE; }
+    	/\\[xX][0-9A-Fa-f]+/		{ currentValue.Symbol = (char) strtol(&_begin[2], &_end, 16); return lgParser::SYMBOL; }
+    	/\\[0-7]+/  				{ currentValue.Symbol = (char) strtol(&_begin[2], &_end, 8); return lgParser::SYMBOL; }
+    	/\\a/    					{ currentValue.Symbol = '\a'; return lgParser::SYMBOL; }
+    	/\\b/    					{ currentValue.Symbol = '\b'; return lgParser::SYMBOL; }
+    	/\\f/    					{ currentValue.Symbol = '\f'; return lgParser::SYMBOL; }
+    	/\\n/    					{ currentValue.Symbol = '\n'; return lgParser::SYMBOL; }
+    	/\\r/    					{ currentValue.Symbol = '\r'; return lgParser::SYMBOL; }
+    	/\\t/    					{ currentValue.Symbol = '\t'; return lgParser::SYMBOL; }
+    	/\\v/    					{ currentValue.Symbol = '\v'; return lgParser::SYMBOL; }
+    	/\\\\/    					{ currentValue.Symbol = '\\'; return lgParser::SYMBOL; }
+    	/\\'/    					{ currentValue.Symbol = '\''; return lgParser::SYMBOL; }
+    	/\\"/  						{ currentValue.Symbol = '"'; return lgParser::SYMBOL; }
+    	/\\\?/    					{ currentValue.Symbol = '?'; return lgParser::SYMBOL; }
+    	/\\./   					{
+    	                                std::cerr << "Invalid escape sequence '\\" << _begin[1]
+    	                                          << "' in quoted string on line " << getLineNumber() << std::endl;
+    	                                return ERROR;
+    	                            }
+    	/./							{ currentValue.Symbol = *begin(); return lgParser::SYMBOL; }
+	}
+
+	context LEX_STRING_LITERAL {
+    	/\"/ 						{
+										currentValue.StringLiteral = stringLiteral.c_str();
+										pop();
+										return lgParser::STRING_LITERAL;
+									}
+    	/./							{
+										stringLiteral += *begin();
+										return IGNORE;
+									}
+    }
+
+	context ACTION {
+    	"{"		    	            				{ action += *begin(); ++curley_braces; return IGNORE; }
+    	"}"              							{
+                    									action += "}";
+                    									if (--curley_braces == 0) {
+                    										pop();
+                    										currentValue.Action = action.c_str();
+                    										return lgParser::TOKEN_ACTION;
+                    									}
+                    									return IGNORE;
+                    								}
+    	/\"/						                { push(ACTION_DOUBLE_QUOTED_STRING); action += "\""; return IGNORE; }
+    	/\'(\\([0-7]+|[xX][0-9A-Fa-f]+|.))\'/	{
+													  for (auto i = begin(); i != end(); ++i)
+														action += *i;
+													  return IGNORE;
+													}
+    	/\'.\'/						                {
+													  for (auto i = begin(); i != end(); ++i)
+														action += *i;
+													  return IGNORE;
+													}
+    	/\r?\n/						                {
+													  newLine();
+													  action += '\n';
+													  return IGNORE;
+													}
+    	/./							                { action += *begin(); return IGNORE; }
+	}
+
+	context CODE {
+    	"{"		    	            				{ action += *begin(); ++curley_braces; return IGNORE; }
+    	"}"              							{
+                    									if (--curley_braces == 0) {
+                    										pop();
+                    										currentValue.CodeBlock = new CodeBlock(action, yyfnln, filename);
+                    										return lgParser::TOKEN_CODE;
+                    									}
+														else {
+	                    									action += "}";
+		                									return IGNORE;
+														}
+                    								}
+    	/\"/						                { push(ACTION_DOUBLE_QUOTED_STRING); action += "\""; return IGNORE; }
+    	/\'(\\([0-7]+|[xX][0-9A-Fa-f]+|.))\'/		{
+													  for (auto i = begin(); i != end(); ++i)
+														action += *i;
+													  return IGNORE;
+													}
+    	/\'.\'/						                {
+													  for (auto i = begin(); i != end(); ++i)
+														action += *i;
+													  return IGNORE;
+													}
+    	/\r?\n/						                {
+													  newLine();
+													  action += '\n';
+													  return IGNORE;
+													}
+    	/./							                { action += *begin(); return IGNORE; }
+	}
+
+	context ACTION_DOUBLE_QUOTED_STRING {
+		/"/								{ action += *begin(); pop(); return IGNORE; }
+		/\\/							{ action += *begin(); push(ACTION_DOUBLE_QUOTED_STRING_ESCAPE_SEQUENCE); return IGNORE; }
+		/./								{ action += *begin(); return IGNORE; }
+	}
+
+	context ACTION_DOUBLE_QUOTED_STRING_ESCAPE_SEQUENCE {
+    	/[xX][0-9A-Fa-f]+/			{
+									  for (auto i = begin(); i != end(); ++i)
+										action += *i;
+									  pop();
+									  return IGNORE;
+									}
+    	/[0-7]+/  					{
+									  for (auto i = begin(); i != end(); ++i)
+										action += *i;
+									  pop();
+									  return IGNORE;
+									}
+    	/a/    						{ action += *begin(); pop(); return IGNORE; }
+    	/b/    						{ action += *begin(); pop(); return IGNORE; }
+    	/f/    						{ action += *begin(); pop(); return IGNORE; }
+    	/n/    						{ action += *begin(); pop(); return IGNORE; }
+    	/r/    						{ action += *begin(); pop(); return IGNORE; }
+    	/t/    						{ action += *begin(); pop(); return IGNORE; }
+    	/v/    						{ action += *begin(); pop(); return IGNORE; }
+    	/\\/    					{ action += *begin(); pop(); return IGNORE; }
+    	/'/    						{ action += *begin(); pop(); return IGNORE; }
+    	/"/  						{ action += *begin(); pop(); return IGNORE; }
+    	/\?/    					{ action += *begin(); pop(); return IGNORE; }
+    	/./   						{
+    	                                std::cerr << "Invalid escape sequence '\\" << *begin()
+    	                                          << "' in quoted string on line " << getLineNumber() << std::endl;
+										action += *begin();
+										pop();
+    	                                return ERROR;
+    	                            }
+	}
+	context STRING_LITERAL {
+    	/\"/ 						{
+										currentValue.StringLiteral = stringLiteral.c_str();
+										pop();
+										return lgParser::STRING_LITERAL;
+									}
+    	/./							{
+										stringLiteral += *begin();
+										return IGNORE;
+									}
+    }
+	context COMMENT {
+		"*/"						{ pop(); return IGNORE; }
+		/\r?\n/						{ newLine(); return IGNORE; }
+		/./							{ return IGNORE;}
+	}
+	context SINGLE_LINE_COMMENT {
+		/\r?\n/						{ newLine(); pop(); return IGNORE; }
+		/./							{ return IGNORE; }
+	}
+}
+
+// End g/src/bootstrap/self-bootstrap/lg-bootstrap/lg.lg

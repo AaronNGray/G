@@ -1,0 +1,25 @@
+TTG - Textual(temporary) Template Generator
+
+TTG is a temporary hack until TG the syntatic and semantic solution is put in place.
+
+    And normal text will be output by the generated template vode straight as it is.
+
+        OS << "normal text";
+
+    SUPERCODE Code blocks are output directly into the template function as it.
+
+        {{ auto guard = generateGuardString(base_filepath + ".pg.h"); }}
+
+    will result in the braced code being putput directly
+
+        auto guard = generateGuardString(base_filepath + ".pg.h");
+
+    Parameters are output as output into the template function
+
+        (( parameter }}
+
+    sas such
+
+        OS << parameter;
+
+    TABS and NEWLINES are output directly.

@@ -1,0 +1,149 @@
+//
+//  g/src/tools/ag/ag.pg
+//
+//  Property and Copyright © 2016 - 2022 Aaron Nathaniel Gray under the MIT License
+//
+
+grammar AG "LR(1)" {
+
+header {
+	#include <io.h>
+	#include <iostream>
+	#include <cassert>
+	#include "g/Logger.h"
+	#include "g/AbstractSyntaxTreeGenerator/AbstractSyntaxTree.h"
+
+	using namespace G::AbstractSyntaxTreeGenerator;
+
+	extern Logger* logger;
+
+	union ValueType {
+		AbstractSyntaxTree::Root *Root;
+		AbstractSyntaxTree::Module *Module;
+		AbstractSyntaxTree::Declarations *Declarations;
+		AbstractSyntaxTree::Datatype *Datatype;
+		AbstractSyntaxTree::Types* Types;
+		AbstractSyntaxTree::Type* Type;
+		AbstractSyntaxTree::Arguments* Arguments;
+		AbstractSyntaxTree::Argument* Argument;
+		AbstractSyntaxTree::Block* Block;
+    	AbstractSyntaxTree::Identifier *Identifier;
+    	AbstractSyntaxTree::Code *Code;
+	};
+
+    extern ValueType currentValue;
+    using namespace Runtime;
+};
+
+code {
+	#include "ag.lg.h"
+	ValueType currentValue;
+};
+code {
+	void agParser::reportError(State state, Input input) {
+		std::string report = std::string("Found ") + Terminals[input] + " Expecting ";
+
+		Pair<Action>* pair = ShiftReduce_states[state - 1]->pair;
+		if (pair) {
+			for (size_t pairs = ShiftReduce_states[state - 1]->pairs; pairs > 0; --pairs) {
+                report += std::string(Terminals[pair->input]) + ((pairs > 1) ? ", " : "");
+				++pair;
+			}
+		}
+		else
+            report += std::string("<nothing>");
+        report += std::string(" in state ") + std::to_string(state) + ".\n";
+
+		logger->LogError(new SyntaxErrorObject(report, lexer->getLineNumber(), lexer->getCharacter()));
+	}
+};
+
+roottype "AbstractSyntaxTree";
+basetype union "ValueType";
+
+nonterm AbstractSyntaxTree;
+nonterm OptDeclarations : Declarations;
+nonterm Declarations;
+nonterm Declaration : Datatype;
+nonterm OptTypes : Types;
+nonterm Types;
+nonterm Type;
+nonterm Arguments;
+nonterm Argument;
+nonterm Block;
+
+term KEYWORD_MODULE						"module";
+
+term KEYWORD_CODE						"code";
+term KEYWORD_HEADER						"header";
+
+term KEYWORD_DATATYPE					"datatype";
+
+term OPERATOR_OPEN_CURLY_BRACE	        "{";
+term OPERATOR_CLOSE_CURLY_BRACE	        "}";
+term OPERATOR_OPEN_PARENTHSIS	        "(";
+term OPERATOR_CLOSE_PARENTHSIS	        ")";
+term OPERATOR_SEMICOLON			        ";";
+term OPERATOR_COLON				        ":";
+term OPERATOR_COMMA				        ",";
+term OPERATOR_EQUALS                    "=";
+term OPERATOR_BAR                       "|";
+
+term Identifier : Identifier;
+term Code : Code;
+term NEWLINE;
+
+production AbstractSyntaxTree =
+    "module" name:Identifier "{" body:OptDeclarations "}" { root->newModule($name$, $body$); }
+;
+
+production OptDeclarations =
+    Declarations { $$ = $1; }
+  | epsilon { $$ = nullptr; }
+;
+
+production Declarations =
+    Declarations Declaration { $$ = $1; $1->add($2); }
+  | Declaration { $$ = root->newDeclarations(); }
+;
+
+production Declaration =
+    "datatype" name:Identifier types:OptTypes ";" { $$ = root->newDatatype($name$, $types$); }
+  | "datatype" name:Identifier block:Block types:OptTypes ";" { $$ = root->newDatatype($name$, $block$, $types$); }
+  | "datatype" name:Identifier "(" arguments:Arguments ")" types:OptTypes ";" { $$ = root->newDatatype($name$, $arguments$, $types$); }
+  | "datatype" name:Identifier block:Block "(" arguments:Arguments ")" types:OptTypes ";" { $$ = root->newDatatype($name$, $block$, $arguments$, $types$); }
+;
+
+production OptTypes =
+    "=" Types { $$ = $2; }
+  | epsilon { $$ = nullptr; }
+;
+
+production Types =
+    Types "|" Type { $1->add($3);}
+  | Type { $$ = root->newTypes(); $$->add($1); }
+;
+
+production Type =
+    name:Identifier { $$ = root->newType($name$); }
+  | name:Identifier block:Block { $$ = root->newType($name$, $block$); }
+  | name:Identifier "(" arguments:Arguments ")" { $$ = root->newType($name$, $arguments$); }
+  | name:Identifier "(" arguments:Arguments ")" block:Block { $$ = root->newType($name$, $arguments$, $block$);}
+;
+
+production Arguments =
+    Arguments "," Argument { $$ = $1; $1->add($3); }
+  | Argument { $$ = root->newArguments(); }
+;
+
+production Argument =
+    name:Identifier ":" type:Identifier { $$ = root->newArgument($name$, $type$); }
+;
+
+production Block =
+    "{" block:Block "}" { $$ = $block$; }	// TODO: Normalize Code .v. Block
+;
+
+}
+
+// End g/src/tools/ag/ag.pg

@@ -1,0 +1,41 @@
+module ParserGenerator {
+    template function ParserGenerator::OutputCXX () {
+        #include "((base_filepath)).pg.h"
+
+        ((code))
+
+        (( lr1->OutputCXX(className) ))
+
+        const char* ((className))::Terminals[(( grammar->terminals.size() ))] = {
+        {{
+            for (size_t terminal = 0, terminals = grammar->terminals.size(); terminal < terminals; ++terminal) {
+        }}
+                    "((grammar->terminals[terminal]->getName()))"
+        {{
+                if (terminal < terminals - 1)
+        }}
+                    ,
+        {{
+            }
+        }}
+        };
+
+        void ((className))::reportError(State state, Input input) {
+        	std::cout << "Error: Found " << Terminals[input] << " Expecting ";
+
+        	Pair<Action>* pair = ShiftReduce_states[state - 1]->pair;
+        	if (pair) {
+        		for (size_t pairs = ShiftReduce_states[state - 1]->pairs; pairs > 0; --pairs) {
+        		    std::cout << Terminals[pair->input] << ( (pairs > 1) ? ", " : "\"");
+        		    ++pair;
+        		}
+        	}
+        	else
+        		std::cout << "<nothing>";
+        	std::cout << " in state " << state << " on line" << lexer->getLineNumber() << ".";
+        }
+
+        {{ if (actions->size()) }}
+            (( actions->OutputActionsCXX(className, input_filename, returnType) ))
+    };
+}

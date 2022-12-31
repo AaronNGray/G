@@ -1,5 +1,5 @@
 # G stands for Generator
-G is a source to source compiler compiler with a code parser and generator initially to be written in C++
+G is a source to source compiler compiler with a code parser and generator initially to be written in C++, generating C++.
 
 Tools :-
  - LG - Lexical Analyser Generator
@@ -25,16 +25,16 @@ A 'lex' style lexical analyser generator. Takes a .lg file and generates a lexic
 
 Uses Two "new" alogorithms :-
  - The Dragon Book Algorithm 3.5 that converts a Regular Expression into a DFA
- - Equivanance classes from analysing input sysmbols
+ - Equivalence classes from analysing input sysmbols
 
 ## PG - Parser Generator ##
 
 A 'YACC' style Parser Generator. Takes a .pg file and generates a parser library.
 
- - [ ] LL(1)
+ - [x] LL(1)
  - [ ] SLR
  - [ ] LR(0)
- - [ ] LR(1)
+ - [x] LR(1)
  - [x] LALR(1)
  - [ ] LAR(m)
  - [ ] RNGLR

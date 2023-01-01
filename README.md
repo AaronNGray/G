@@ -61,9 +61,8 @@ Template generator generates AST's from a grammar augmented with templating synt
 ## G - Generate ##
 
 G will tie together all the libraries together and does what all the tools do using *.g format files. G will combine lexical specifications and grammar specifications into one specificiation. And will also allow higherlevel modular grammars to be defined.
-# Instillation
 
-# Build
+# Instillation
 
 Requires :-
   - Visual Studio 2022
@@ -88,7 +87,7 @@ Git clone
 
     `git clone https://github.com/AaronNGray/G.git`
 
-## Build
+# Build
 
  - Run premake :-
 

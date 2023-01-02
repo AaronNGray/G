@@ -1,5 +1,5 @@
 # G stands for Generator
-G is a source to source compiler compiler with a code parser and generator initially to be written in C++
+G is a source to source compiler compiler with a code parser and generator initially to be written in C++, generating C++.
 
 Tools :-
  - LG - Lexical Analyser Generator
@@ -25,22 +25,22 @@ A 'lex' style lexical analyser generator. Takes a .lg file and generates a lexic
 
 Uses Two "new" alogorithms :-
  - The Dragon Book Algorithm 3.5 that converts a Regular Expression into a DFA
- - Equivanance classes from analysing input sysmbols
+ - Equivalence classes from analysing input sysmbols
 
 ## PG - Parser Generator ##
 
 A 'YACC' style Parser Generator. Takes a .pg file and generates a parser library.
 
- [ ] LL(1)
- [ ] SLR
- [ ] LR(0)
- [ ] LR(1)
- [x] LALR(1)
- [ ] LAR(m)
- [ ] RNGLR
- [ ] SPPF
- [ ] Pakrat
- [ ] Recursive Descent with Backtracking and Memorization
+ - [x] LL(1)
+ - [ ] SLR
+ - [ ] LR(0)
+ - [x] LR(1)
+ - [x] LALR(1)
+ - [ ] LAR(m)
+ - [ ] RNGLR
+ - [ ] SPPF
+ - [ ] Pakrat
+ - [ ] Recursive Descent with Backtracking and Memorization
 
 ## AG - AST Generator ##
 
@@ -56,14 +56,13 @@ The Generator Generator takes a Grammar and generates methods that convert an AS
 
 ## TG - Template Generator ##
 
-Template generator generates AST's from augmented grammars and a template library for generating instance AST's
+Template generator generates AST's from a grammar augmented with templating syntax generating methods that generate instance AST's. This allows clean syntatic templating.
 
 ## G - Generate ##
 
-G ties all the libraries together and does what all the tools do using *.g format files. And will also allow higherlevel modular grammars to pre defined.
-# Instillation
+G will tie together all the libraries together and does what all the tools do using *.g format files. G will combine lexical specifications and grammar specifications into one specificiation. And will also allow higherlevel modular grammars to be defined.
 
-# Build
+# Instillation
 
 Requires :-
   - Visual Studio 2022
@@ -88,7 +87,7 @@ Git clone
 
     `git clone https://github.com/AaronNGray/G.git`
 
-## Build
+# Build
 
  - Run premake :-
 

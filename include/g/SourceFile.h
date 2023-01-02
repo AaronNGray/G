@@ -26,18 +26,17 @@ class SourceFile {
 public:
 	typedef AST AST;
 
-	SourceFile() : filename(), ast(), actions() {}
+	SourceFile() : filename(), ast() {}
 
-	SourceFile(SourceFile<AST>& sourceFile) : filename(sourceFile.filename), ast(sourceFile.ast), actions(sourceFile.actions) {}
+	SourceFile(SourceFile<AST>& sourceFile) : filename(sourceFile.filename), ast(sourceFile.ast) {}
 
-	SourceFile(FileName& filename) : filename(filename), ast(new AST), actions(new Actions()) {}
-//	SourceFile(std::string& filename) : filename(FileName(filename)), ast(new AST), actions(new Actions()) {}
+	SourceFile(FileName& filename) : filename(filename), ast(new AST) {}
 
 	SourceFile(FileName& filename, std::string rootType, std::string valueType, bool useUnion, std::string returnType) :
-		filename(filename), ast(new AST), actions(new Actions()), rootTypeName(rootType), valueType(valueType), useUnion(useUnion), returnType(returnType) {}
+		filename(filename), ast(new AST), rootTypeName(rootType), valueType(valueType), useUnion(useUnion), returnType(returnType) {}
 
-	SourceFile(FileName& filename, AST *ast, Actions* actions, std::string rootType, std::string valueType, bool useUnion, std::string returnType) :
-		filename(filename), ast(ast), actions(actions), rootTypeName(rootType), valueType(valueType), useUnion(useUnion), returnType(returnType) {}
+	SourceFile(FileName& filename, AST *ast, std::string rootType, std::string valueType, bool useUnion, std::string returnType) :
+		filename(filename), ast(ast), rootTypeName(rootType), valueType(valueType), useUnion(useUnion), returnType(returnType) {}
 
 	~SourceFile() {}
 
@@ -62,7 +61,7 @@ public:
 		return ast;
 	}
 	void setActions(Actions* actions) {
-		this->actions = actions;
+		getAST()->setActions(actions);
 	}
 	Actions* getActions() const {
 		return getAST()->getActions();
@@ -124,7 +123,6 @@ protected:
 	FileName filename;
 
 	AST* ast;
-	Actions* actions;
 
 	CodeBlocks code;
 	CodeBlocks header;

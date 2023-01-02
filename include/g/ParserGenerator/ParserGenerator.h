@@ -28,7 +28,7 @@ template <class Grammar = ContextFreeGrammar>
 class ParserGenerator {
 public:
 	ParserGenerator(SourceFile<Grammar>* sourceFile, Logger* logger, bool lineDirectives = true, bool debug = false);
-	ParserGenerator(FileName& filename, Grammar* grammar, Actions* actions, std::string rootType, std::string valueType, bool _union, std::string returnType, std::initializer_list<CodeBlock> headers, const std::initializer_list<CodeBlock> code);
+	ParserGenerator(FileName& filename, Grammar* grammar, std::string rootType, std::string valueType, bool _union, std::string returnType, std::initializer_list<CodeBlock> headers, const std::initializer_list<CodeBlock> code);
 
 	FileName getFilename() const {
 		return sourceFile->getFilename();
@@ -195,7 +195,7 @@ private:
 
 template <class Grammar>
 ParserGenerator<Grammar>::ParserGenerator(SourceFile<Grammar>* sourceFile, Logger* logger, bool lineDirectives, bool debug) :
-	sourceFile(sourceFile), /*actions(grammar->getActions()), useUnion(false), */ logger(logger), lineDirectives(lineDirectives), debug(debug)
+	sourceFile(sourceFile), logger(logger), lineDirectives(lineDirectives), debug(debug)
 {
 	logger->setFilename(getFilename().toString());
 
@@ -240,8 +240,8 @@ ParserGenerator<Grammar>::ParserGenerator(SourceFile<Grammar> sourceFile, Logger
 }
 */
 template <class Grammar>
-ParserGenerator<Grammar>::ParserGenerator(FileName& filename, Grammar* grammar, Actions* actions, std::string rootType, std::string valueType, bool useUnion, std::string returnType, const std::initializer_list<CodeBlock> headers, const std::initializer_list<CodeBlock> codes) :
-	sourceFile(new SourceFile<Grammar>(filename, grammar, actions, rootType, valueType, useUnion, returnType)), lineDirectives(true), debug(false)
+ParserGenerator<Grammar>::ParserGenerator(FileName& filename, Grammar* grammar, std::string rootType, std::string valueType, bool useUnion, std::string returnType, const std::initializer_list<CodeBlock> headers, const std::initializer_list<CodeBlock> codes) :
+	sourceFile(new SourceFile<Grammar>(filename, grammar, rootType, valueType, useUnion, returnType)), lineDirectives(true), debug(false)
 {
 	base_filepath = getFilename().remove_extension();
 	basename = getFilename().base_name();
@@ -420,8 +420,8 @@ void ParserGenerator<Grammar>::GenerateSourceCXX() const {
 	output << nonstd::endl << nonstd::endl;
 	output << "ParserGenerator<ContextFreeGrammar>* " << basename << "_ParserGenerator() {" << nonstd::endl;
 	output << "\tFileName filename(\"" + basename + "\");" + nonstd::endl;
-		output << "\treturn new ParserGenerator<ContextFreeGrammar>(" << nonstd::endl;
-	output << "\t\t" << "filename, " << basename << "_bootstrap(), &bootstrapActions," << nonstd::endl;
+	output << "\treturn new ParserGenerator<ContextFreeGrammar>(" << nonstd::endl;
+	output << "\t\t" << "filename, " << basename << "_bootstrap()," << nonstd::endl;
 
 	output << "\t\t" "\"" << getRootTypeName() << "\"," << nonstd::endl;
 	output << "\t\t" << "\"" << getValueType() << "\"," << nonstd::endl;
@@ -429,7 +429,7 @@ void ParserGenerator<Grammar>::GenerateSourceCXX() const {
 	output << "\t\t" "\"" << getReturnType() << "\"," << nonstd::endl;
 
 	getHeader().GenerateSource(output, 4);
-	output << "\t\t" << ", " << nonstd::endl;
+	output << ", " << nonstd::endl;
 
 	getCode().GenerateSource(output, 4);
 	output << nonstd::endl;

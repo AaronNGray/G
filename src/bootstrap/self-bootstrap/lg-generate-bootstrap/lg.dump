@@ -1,0 +1,594 @@
+base_filepath = C:\Users\aaron\Projects\G\latest\G\src\bootstrap\self-bootstrap\lg-generate-bootstrap\lg
+basename = lg
+className = lgLexer
+lineDirectives = 1
+header = {
+
+		#include <string>
+		#include "lg.pg.h"
+		#include "nonstd/Utils.h"
+
+		enum MODE { NORMAL, CODE_BLOCK };
+	
+}
+code = {
+
+		std::string action;
+		char identifier[132];
+		std::string stringLiteral;
+		int yyfnln;
+		int curley_braces = 0;
+		MODE bracket_mode = NORMAL;
+
+		extern LexicalGenerator*	lexicalGenerator;
+
+		using namespace Runtime;
+	
+}
+diagnostics = 205
+compressed = 1
+debug = 0
+lexicalMachine:LexicalMachine = {
+diagnostics = 0
+compressed = 1
+debug = 0
+name = LG
+className = lgLexer
+baseClassName = Runtime::Lexer
+rootTypeName = RegularGrammar
+baseClass = Lexer
+valueType = ValueType
+returnType = int
+equivalenceClasses = { 0, 9, 10, 11, 13, 14, 32, 33, 34, 35, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 56, 58, 63, 64, 65, 71, 88, 89, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126}
+
+startContextName = INITIAL
+contexts = [
+    {
+        name = INITIAL
+        className = INITIAL
+        compressed = 1
+        regularGrammar = Selection(Selection(Selection(Selection(Selection(Selection(Selection(Selection(Sequence(Sequence(Sequence(Sequence(Sequence(CharacterClass('l'), CharacterClass('e')), CharacterClass('x')), CharacterClass('e')), CharacterClass('r')), End(5, <empty>)), Sequence(Sequence(CharacterClass('[Range(65, 90)_Range(97, 122)]'), Kleene(CharacterClass('[Range(48, 57)Range(65, 90)_Range(97, 122)]'))), End(8, <empty>))), Sequence(CharacterClass('{'), End(10, <empty>))), Sequence(CharacterClass('}'), End(12, <empty>))), Sequence(Sequence(CharacterClass('/'), CharacterClass('*')), End(15, <empty>))), Sequence(Sequence(CharacterClass('/'), CharacterClass('/')), End(18, <empty>))), Sequence(Sequence(CharacterClass('[\x9 ]'), Kleene(CharacterClass('[\x9 ]'))), End(21, <empty>))), Sequence(Sequence(Optional(CharacterClass('\xd')), CharacterClass('\xa')), End(24, <empty>))), Sequence(CharacterClass('[^\xa\xd]'), End(26, <empty>)))
+        positionToSet = {
+            0 = 0
+            1 = 1
+            2 = 2
+            3 = 3
+            4 = 4
+            5 = 0
+            6 = 5
+            7 = 6
+            8 = 0
+            9 = 7
+            10 = 0
+            11 = 8
+            12 = 0
+            13 = 9
+            14 = 10
+            15 = 0
+            16 = 11
+            17 = 12
+            18 = 0
+            19 = 13
+            20 = 14
+            21 = 0
+            22 = 15
+            23 = 16
+            24 = 0
+            25 = 17
+            26 = 0
+        }
+    }
+    {
+        name = LEXER
+        className = LEXER
+        compressed = 1
+        regularGrammar = Selection(Selection(Selection(Selection(Selection(Selection(Selection(Selection(Selection(Selection(Selection(Selection(Selection(Selection(Selection(Selection(Sequence(Sequence(Sequence(Sequence(Sequence(Sequence(Sequence(CharacterClass('c'), CharacterClass('o')), CharacterClass('n')), CharacterClass('t')), CharacterClass('e')), CharacterClass('x')), CharacterClass('t')), End(7, <empty>)), Sequence(Sequence(Sequence(Sequence(Sequence(CharacterClass('s'), CharacterClass('t')), CharacterClass('a')), CharacterClass('r')), CharacterClass('t')), End(13, <empty>))), Sequence(Sequence(Sequence(Sequence(CharacterClass('c'), CharacterClass('o')), CharacterClass('d')), CharacterClass('e')), End(18, <empty>))), Sequence(Sequence(Sequence(Sequence(Sequence(Sequence(CharacterClass('h'), CharacterClass('e')), CharacterClass('a')), CharacterClass('d')), CharacterClass('e')), CharacterClass('r')), End(25, <empty>))), Sequence(Sequence(Sequence(Sequence(Sequence(Sequence(Sequence(Sequence(Sequence(CharacterClass('b'), CharacterClass('a')), CharacterClass('s')), CharacterClass('e')), CharacterClass('c')), CharacterClass('l')), CharacterClass('a')), CharacterClass('s')), CharacterClass('s')), End(35, <empty>))), Sequence(Sequence(Sequence(Sequence(Sequence(Sequence(Sequence(Sequence(CharacterClass('r'), CharacterClass('o')), CharacterClass('o')), CharacterClass('t')), CharacterClass('t')), CharacterClass('y')), CharacterClass('p')), CharacterClass('e')), End(44, <empty>))), Sequence(Sequence(Sequence(Sequence(Sequence(Sequence(Sequence(Sequence(Sequence(CharacterClass('v'), CharacterClass('a')), CharacterClass('l')), CharacterClass('u')), CharacterClass('e')), CharacterClass('t')), CharacterClass('y')), CharacterClass('p')), CharacterClass('e')), End(54, <empty>))), Sequence(Sequence(Sequence(Sequence(Sequence(Sequence(Sequence(Sequence(Sequence(Sequence(CharacterClass('r'), CharacterClass('e')), CharacterClass('t')), CharacterClass('u')), CharacterClass('r')), CharacterClass('n')), CharacterClass('t')), CharacterClass('y')), CharacterClass('p')), CharacterClass('e')), End(65, <empty>))), Sequence(Sequence(CharacterClass('[Range(65, 90)_Range(97, 122)]'), Kleene(CharacterClass('[Range(48, 57)Range(65, 90)_Range(97, 122)]'))), End(68, <empty>))), Sequence(CharacterClass('"'), End(70, <empty>))), Sequence(CharacterClass('{'), End(72, <empty>))), Sequence(CharacterClass('}'), End(74, <empty>))), Sequence(Sequence(CharacterClass('/'), CharacterClass('*')), End(77, <empty>))), Sequence(Sequence(CharacterClass('/'), CharacterClass('/')), End(80, <empty>))), Sequence(Sequence(CharacterClass('[\x9 ]'), Kleene(CharacterClass('[\x9 ]'))), End(83, <empty>))), Sequence(Sequence(Optional(CharacterClass('\xd')), CharacterClass('\xa')), End(86, <empty>))), Sequence(CharacterClass('[^\xa\xd]'), End(88, <empty>)))
+        positionToSet = {
+            0 = 18
+            1 = 19
+            2 = 20
+            3 = 21
+            4 = 22
+            5 = 23
+            6 = 24
+            7 = 0
+            8 = 25
+            9 = 26
+            10 = 27
+            11 = 28
+            12 = 29
+            13 = 0
+            14 = 30
+            15 = 31
+            16 = 32
+            17 = 33
+            18 = 0
+            19 = 34
+            20 = 35
+            21 = 36
+            22 = 37
+            23 = 38
+            24 = 39
+            25 = 0
+            26 = 40
+            27 = 41
+            28 = 42
+            29 = 43
+            30 = 44
+            31 = 45
+            32 = 46
+            33 = 47
+            34 = 48
+            35 = 0
+            36 = 49
+            37 = 50
+            38 = 51
+            39 = 52
+            40 = 53
+            41 = 54
+            42 = 55
+            43 = 56
+            44 = 0
+            45 = 57
+            46 = 58
+            47 = 59
+            48 = 60
+            49 = 61
+            50 = 62
+            51 = 63
+            52 = 64
+            53 = 65
+            54 = 0
+            55 = 66
+            56 = 67
+            57 = 68
+            58 = 69
+            59 = 70
+            60 = 71
+            61 = 72
+            62 = 73
+            63 = 74
+            64 = 75
+            65 = 0
+            66 = 76
+            67 = 77
+            68 = 0
+            69 = 78
+            70 = 0
+            71 = 79
+            72 = 0
+            73 = 80
+            74 = 0
+            75 = 81
+            76 = 82
+            77 = 0
+            78 = 83
+            79 = 84
+            80 = 0
+            81 = 85
+            82 = 86
+            83 = 0
+            84 = 87
+            85 = 88
+            86 = 0
+            87 = 89
+            88 = 0
+        }
+    }
+    {
+        name = CONTEXT
+        className = CONTEXT
+        compressed = 1
+        regularGrammar = Selection(Selection(Selection(Selection(Selection(Selection(Selection(Selection(Sequence(CharacterClass('/'), End(1, <empty>)), Sequence(CharacterClass('"'), End(3, <empty>))), Sequence(CharacterClass('{'), End(5, <empty>))), Sequence(CharacterClass('}'), End(7, <empty>))), Sequence(Sequence(CharacterClass('/'), CharacterClass('*')), End(10, <empty>))), Sequence(Sequence(CharacterClass('/'), CharacterClass('/')), End(13, <empty>))), Sequence(Sequence(CharacterClass('[\x9 ]'), Kleene(CharacterClass('[\x9 ]'))), End(16, <empty>))), Sequence(Sequence(Optional(CharacterClass('\xd')), CharacterClass('\xa')), End(19, <empty>))), Sequence(CharacterClass('[^\xa\xd]'), End(21, <empty>)))
+        positionToSet = {
+            0 = 90
+            1 = 0
+            2 = 91
+            3 = 0
+            4 = 92
+            5 = 0
+            6 = 93
+            7 = 0
+            8 = 94
+            9 = 95
+            10 = 0
+            11 = 96
+            12 = 97
+            13 = 0
+            14 = 98
+            15 = 99
+            16 = 0
+            17 = 100
+            18 = 101
+            19 = 0
+            20 = 102
+            21 = 0
+        }
+    }
+    {
+        name = RE
+        className = RE
+        compressed = 1
+        regularGrammar = Selection(Selection(Selection(Selection(Selection(Selection(Selection(Selection(Selection(Selection(Selection(Selection(Selection(Selection(Selection(Selection(Selection(Selection(Selection(Selection(Selection(Selection(Selection(Selection(Selection(Selection(Selection(Selection(Sequence(CharacterClass('/'), End(1, <empty>)), Sequence(CharacterClass('['), End(3, <empty>))), Sequence(CharacterClass('|'), End(5, <empty>))), Sequence(CharacterClass('*'), End(7, <empty>))), Sequence(CharacterClass('+'), End(9, <empty>))), Sequence(CharacterClass('?'), End(11, <empty>))), Sequence(CharacterClass('('), End(13, <empty>))), Sequence(CharacterClass(')'), End(15, <empty>))), Sequence(CharacterClass('[Range(48, 57)Range(65, 90)Range(97, 122)]'), End(17, <empty>))), Sequence(Sequence(Sequence(CharacterClass('\'), CharacterClass('[Xx]')), Sequence(CharacterClass('[Range(48, 57)Range(65, 70)Range(97, 102)]'), Kleene(CharacterClass('[Range(48, 57)Range(65, 70)Range(97, 102)]')))), End(22, <empty>))), Sequence(Sequence(CharacterClass('\'), Sequence(CharacterClass('[Range(48, 55)]'), Kleene(CharacterClass('[Range(48, 55)]')))), End(26, <empty>))), Sequence(Sequence(CharacterClass('\'), CharacterClass('a')), End(29, <empty>))), Sequence(Sequence(CharacterClass('\'), CharacterClass('b')), End(32, <empty>))), Sequence(Sequence(CharacterClass('\'), CharacterClass('f')), End(35, <empty>))), Sequence(Sequence(CharacterClass('\'), CharacterClass('n')), End(38, <empty>))), Sequence(Sequence(CharacterClass('\'), CharacterClass('r')), End(41, <empty>))), Sequence(Sequence(CharacterClass('\'), CharacterClass('t')), End(44, <empty>))), Sequence(Sequence(CharacterClass('\'), CharacterClass('v')), End(47, <empty>))), Sequence(Sequence(CharacterClass('\'), CharacterClass(''')), End(50, <empty>))), Sequence(Sequence(CharacterClass('\'), CharacterClass('"')), End(53, <empty>))), Sequence(Sequence(CharacterClass('\'), CharacterClass('?')), End(56, <empty>))), Sequence(Sequence(CharacterClass('\'), CharacterClass('\')), End(59, <empty>))), Sequence(Sequence(CharacterClass('\'), CharacterClass('/')), End(62, <empty>))), Sequence(Sequence(CharacterClass('\'), CharacterClass(']')), End(65, <empty>))), Sequence(Sequence(CharacterClass('\'), CharacterClass('-')), End(68, <empty>))), Sequence(Sequence(CharacterClass('\'), CharacterClass('[^\xa\xd]')), End(71, <empty>))), Sequence(CharacterClass(' '), End(73, <empty>))), Sequence(CharacterClass('.'), End(75, <empty>))), Sequence(CharacterClass('[^\xa\xd]'), End(77, <empty>)))
+        positionToSet = {
+            0 = 103
+            1 = 0
+            2 = 104
+            3 = 0
+            4 = 105
+            5 = 0
+            6 = 106
+            7 = 0
+            8 = 107
+            9 = 0
+            10 = 108
+            11 = 0
+            12 = 109
+            13 = 0
+            14 = 110
+            15 = 0
+            16 = 111
+            17 = 0
+            18 = 112
+            19 = 113
+            20 = 114
+            21 = 115
+            22 = 0
+            23 = 116
+            24 = 117
+            25 = 118
+            26 = 0
+            27 = 119
+            28 = 120
+            29 = 0
+            30 = 121
+            31 = 122
+            32 = 0
+            33 = 123
+            34 = 124
+            35 = 0
+            36 = 125
+            37 = 126
+            38 = 0
+            39 = 127
+            40 = 128
+            41 = 0
+            42 = 129
+            43 = 130
+            44 = 0
+            45 = 131
+            46 = 132
+            47 = 0
+            48 = 133
+            49 = 134
+            50 = 0
+            51 = 135
+            52 = 136
+            53 = 0
+            54 = 137
+            55 = 138
+            56 = 0
+            57 = 139
+            58 = 140
+            59 = 0
+            60 = 141
+            61 = 142
+            62 = 0
+            63 = 143
+            64 = 144
+            65 = 0
+            66 = 145
+            67 = 146
+            68 = 0
+            69 = 147
+            70 = 148
+            71 = 0
+            72 = 149
+            73 = 0
+            74 = 150
+            75 = 0
+            76 = 151
+            77 = 0
+        }
+    }
+    {
+        name = CCL
+        className = CCL
+        compressed = 1
+        regularGrammar = Selection(Selection(Selection(Selection(Selection(Selection(Selection(Selection(Selection(Selection(Selection(Selection(Selection(Selection(Selection(Selection(Selection(Selection(Selection(Selection(Sequence(CharacterClass(']'), End(1, <empty>)), Sequence(CharacterClass('-'), End(3, <empty>))), Sequence(CharacterClass('^'), End(5, <empty>))), Sequence(CharacterClass('[^\xa-\]]'), End(7, <empty>))), Sequence(Sequence(Sequence(CharacterClass('\'), CharacterClass('[Xx]')), Sequence(CharacterClass('[Range(48, 57)Range(65, 70)Range(97, 102)]'), Kleene(CharacterClass('[Range(48, 57)Range(65, 70)Range(97, 102)]')))), End(12, <empty>))), Sequence(Sequence(CharacterClass('\'), Sequence(CharacterClass('[Range(48, 55)]'), Kleene(CharacterClass('[Range(48, 55)]')))), End(16, <empty>))), Sequence(Sequence(CharacterClass('\'), CharacterClass('a')), End(19, <empty>))), Sequence(Sequence(CharacterClass('\'), CharacterClass('b')), End(22, <empty>))), Sequence(Sequence(CharacterClass('\'), CharacterClass('f')), End(25, <empty>))), Sequence(Sequence(CharacterClass('\'), CharacterClass('n')), End(28, <empty>))), Sequence(Sequence(CharacterClass('\'), CharacterClass('r')), End(31, <empty>))), Sequence(Sequence(CharacterClass('\'), CharacterClass('t')), End(34, <empty>))), Sequence(Sequence(CharacterClass('\'), CharacterClass('v')), End(37, <empty>))), Sequence(Sequence(CharacterClass('\'), CharacterClass('\')), End(40, <empty>))), Sequence(Sequence(CharacterClass('\'), CharacterClass(''')), End(43, <empty>))), Sequence(Sequence(CharacterClass('\'), CharacterClass('"')), End(46, <empty>))), Sequence(Sequence(CharacterClass('\'), CharacterClass('?')), End(49, <empty>))), Sequence(Sequence(CharacterClass('\'), CharacterClass(']')), End(52, <empty>))), Sequence(Sequence(CharacterClass('\'), CharacterClass('-')), End(55, <empty>))), Sequence(Sequence(CharacterClass('\'), CharacterClass('[^\xa\xd]')), End(58, <empty>))), Sequence(CharacterClass('[^\xa\xd]'), End(60, <empty>)))
+        positionToSet = {
+            0 = 152
+            1 = 0
+            2 = 153
+            3 = 0
+            4 = 154
+            5 = 0
+            6 = 155
+            7 = 0
+            8 = 156
+            9 = 157
+            10 = 158
+            11 = 159
+            12 = 0
+            13 = 160
+            14 = 161
+            15 = 162
+            16 = 0
+            17 = 163
+            18 = 164
+            19 = 0
+            20 = 165
+            21 = 166
+            22 = 0
+            23 = 167
+            24 = 168
+            25 = 0
+            26 = 169
+            27 = 170
+            28 = 0
+            29 = 171
+            30 = 172
+            31 = 0
+            32 = 173
+            33 = 174
+            34 = 0
+            35 = 175
+            36 = 176
+            37 = 0
+            38 = 177
+            39 = 178
+            40 = 0
+            41 = 179
+            42 = 180
+            43 = 0
+            44 = 181
+            45 = 182
+            46 = 0
+            47 = 183
+            48 = 184
+            49 = 0
+            50 = 185
+            51 = 186
+            52 = 0
+            53 = 187
+            54 = 188
+            55 = 0
+            56 = 189
+            57 = 190
+            58 = 0
+            59 = 191
+            60 = 0
+        }
+    }
+    {
+        name = DOUBLE_QUOTED_STRING
+        className = DOUBLE_QUOTED_STRING
+        compressed = 1
+        regularGrammar = Selection(Selection(Selection(Selection(Selection(Selection(Selection(Selection(Selection(Selection(Selection(Selection(Selection(Selection(Selection(Sequence(CharacterClass('"'), End(1, <empty>)), Sequence(Sequence(Sequence(CharacterClass('\'), CharacterClass('[Xx]')), Sequence(CharacterClass('[Range(48, 57)Range(65, 70)Range(97, 102)]'), Kleene(CharacterClass('[Range(48, 57)Range(65, 70)Range(97, 102)]')))), End(6, <empty>))), Sequence(Sequence(CharacterClass('\'), Sequence(CharacterClass('[Range(48, 55)]'), Kleene(CharacterClass('[Range(48, 55)]')))), End(10, <empty>))), Sequence(Sequence(CharacterClass('\'), CharacterClass('a')), End(13, <empty>))), Sequence(Sequence(CharacterClass('\'), CharacterClass('b')), End(16, <empty>))), Sequence(Sequence(CharacterClass('\'), CharacterClass('f')), End(19, <empty>))), Sequence(Sequence(CharacterClass('\'), CharacterClass('n')), End(22, <empty>))), Sequence(Sequence(CharacterClass('\'), CharacterClass('r')), End(25, <empty>))), Sequence(Sequence(CharacterClass('\'), CharacterClass('t')), End(28, <empty>))), Sequence(Sequence(CharacterClass('\'), CharacterClass('v')), End(31, <empty>))), Sequence(Sequence(CharacterClass('\'), CharacterClass('\')), End(34, <empty>))), Sequence(Sequence(CharacterClass('\'), CharacterClass(''')), End(37, <empty>))), Sequence(Sequence(CharacterClass('\'), CharacterClass('"')), End(40, <empty>))), Sequence(Sequence(CharacterClass('\'), CharacterClass('?')), End(43, <empty>))), Sequence(Sequence(CharacterClass('\'), CharacterClass('[^\xa\xd]')), End(46, <empty>))), Sequence(CharacterClass('[^\xa\xd]'), End(48, <empty>)))
+        positionToSet = {
+            0 = 192
+            1 = 0
+            2 = 193
+            3 = 194
+            4 = 195
+            5 = 196
+            6 = 0
+            7 = 197
+            8 = 198
+            9 = 199
+            10 = 0
+            11 = 200
+            12 = 201
+            13 = 0
+            14 = 202
+            15 = 203
+            16 = 0
+            17 = 204
+            18 = 205
+            19 = 0
+            20 = 206
+            21 = 207
+            22 = 0
+            23 = 208
+            24 = 209
+            25 = 0
+            26 = 210
+            27 = 211
+            28 = 0
+            29 = 212
+            30 = 213
+            31 = 0
+            32 = 214
+            33 = 215
+            34 = 0
+            35 = 216
+            36 = 217
+            37 = 0
+            38 = 218
+            39 = 219
+            40 = 0
+            41 = 220
+            42 = 221
+            43 = 0
+            44 = 222
+            45 = 223
+            46 = 0
+            47 = 224
+            48 = 0
+        }
+    }
+    {
+        name = LEX_STRING_LITERAL
+        className = LEX_STRING_LITERAL
+        compressed = 1
+        regularGrammar = Selection(Sequence(CharacterClass('"'), End(1, <empty>)), Sequence(CharacterClass('[^\xa\xd]'), End(3, <empty>)))
+        positionToSet = {
+            0 = 225
+            1 = 0
+            2 = 226
+            3 = 0
+        }
+    }
+    {
+        name = ACTION
+        className = ACTION
+        compressed = 1
+        regularGrammar = Selection(Selection(Selection(Selection(Selection(Selection(Sequence(CharacterClass('{'), End(1, <empty>)), Sequence(CharacterClass('}'), End(3, <empty>))), Sequence(CharacterClass('"'), End(5, <empty>))), Sequence(Sequence(Sequence(CharacterClass('''), Sequence(CharacterClass('\'), Selection(Selection(Sequence(CharacterClass('[Range(48, 55)]'), Kleene(CharacterClass('[Range(48, 55)]'))), Sequence(CharacterClass('[Xx]'), Sequence(CharacterClass('[Range(48, 57)Range(65, 70)Range(97, 102)]'), Kleene(CharacterClass('[Range(48, 57)Range(65, 70)Range(97, 102)]'))))), CharacterClass('\xa')))), CharacterClass(''')), End(15, <empty>))), Sequence(Sequence(Sequence(CharacterClass('''), CharacterClass('[^\xa\xd]')), CharacterClass(''')), End(19, <empty>))), Sequence(Sequence(Optional(CharacterClass('\xd')), CharacterClass('\xa')), End(22, <empty>))), Sequence(CharacterClass('[^\xa\xd]'), End(24, <empty>)))
+        positionToSet = {
+            0 = 227
+            1 = 0
+            2 = 228
+            3 = 0
+            4 = 229
+            5 = 0
+            6 = 230
+            7 = 231
+            8 = 232
+            9 = 233
+            10 = 234
+            11 = 235
+            12 = 236
+            13 = 237
+            14 = 238
+            15 = 0
+            16 = 239
+            17 = 240
+            18 = 241
+            19 = 0
+            20 = 242
+            21 = 243
+            22 = 0
+            23 = 244
+            24 = 0
+        }
+    }
+    {
+        name = CODE
+        className = CODE
+        compressed = 1
+        regularGrammar = Selection(Selection(Selection(Selection(Selection(Selection(Sequence(CharacterClass('{'), End(1, <empty>)), Sequence(CharacterClass('}'), End(3, <empty>))), Sequence(CharacterClass('"'), End(5, <empty>))), Sequence(Sequence(Sequence(CharacterClass('''), Sequence(CharacterClass('\'), Selection(Selection(Sequence(CharacterClass('[Range(48, 55)]'), Kleene(CharacterClass('[Range(48, 55)]'))), Sequence(CharacterClass('[Xx]'), Sequence(CharacterClass('[Range(48, 57)Range(65, 70)Range(97, 102)]'), Kleene(CharacterClass('[Range(48, 57)Range(65, 70)Range(97, 102)]'))))), CharacterClass('[^\xa\xd]')))), CharacterClass(''')), End(15, <empty>))), Sequence(Sequence(Sequence(CharacterClass('''), CharacterClass('[^\xa\xd]')), CharacterClass(''')), End(19, <empty>))), Sequence(Sequence(Optional(CharacterClass('\xd')), CharacterClass('\xa')), End(22, <empty>))), Sequence(CharacterClass('[^\xa\xd]'), End(24, <empty>)))
+        positionToSet = {
+            0 = 245
+            1 = 0
+            2 = 246
+            3 = 0
+            4 = 247
+            5 = 0
+            6 = 248
+            7 = 249
+            8 = 250
+            9 = 251
+            10 = 252
+            11 = 253
+            12 = 254
+            13 = 255
+            14 = 256
+            15 = 0
+            16 = 257
+            17 = 258
+            18 = 259
+            19 = 0
+            20 = 260
+            21 = 261
+            22 = 0
+            23 = 262
+            24 = 0
+        }
+    }
+    {
+        name = ACTION_DOUBLE_QUOTED_STRING
+        className = ACTION_DOUBLE_QUOTED_STRING
+        compressed = 1
+        regularGrammar = Selection(Selection(Sequence(CharacterClass('"'), End(1, <empty>)), Sequence(CharacterClass('\'), End(3, <empty>))), Sequence(CharacterClass('[^\xa\xd]'), End(5, <empty>)))
+        positionToSet = {
+            0 = 263
+            1 = 0
+            2 = 264
+            3 = 0
+            4 = 265
+            5 = 0
+        }
+    }
+    {
+        name = ACTION_DOUBLE_QUOTED_STRING_ESCAPE_SEQUENCE
+        className = ACTION_DOUBLE_QUOTED_STRING_ESCAPE_SEQUENCE
+        compressed = 1
+        regularGrammar = Selection(Selection(Selection(Selection(Selection(Selection(Selection(Selection(Selection(Selection(Selection(Selection(Selection(Sequence(Sequence(CharacterClass('[Xx]'), Sequence(CharacterClass('[Range(48, 57)Range(65, 70)Range(97, 102)]'), Kleene(CharacterClass('[Range(48, 57)Range(65, 70)Range(97, 102)]')))), End(3, <empty>)), Sequence(Sequence(CharacterClass('[Range(48, 55)]'), Kleene(CharacterClass('[Range(48, 55)]'))), End(6, <empty>))), Sequence(CharacterClass('a'), End(8, <empty>))), Sequence(CharacterClass('b'), End(10, <empty>))), Sequence(CharacterClass('f'), End(12, <empty>))), Sequence(CharacterClass('n'), End(14, <empty>))), Sequence(CharacterClass('r'), End(16, <empty>))), Sequence(CharacterClass('t'), End(18, <empty>))), Sequence(CharacterClass('v'), End(20, <empty>))), Sequence(CharacterClass('\'), End(22, <empty>))), Sequence(CharacterClass('''), End(24, <empty>))), Sequence(CharacterClass('"'), End(26, <empty>))), Sequence(CharacterClass('?'), End(28, <empty>))), Sequence(CharacterClass('[^\xa\xd]'), End(30, <empty>)))
+        positionToSet = {
+            0 = 266
+            1 = 267
+            2 = 268
+            3 = 0
+            4 = 269
+            5 = 270
+            6 = 0
+            7 = 271
+            8 = 0
+            9 = 272
+            10 = 0
+            11 = 273
+            12 = 0
+            13 = 274
+            14 = 0
+            15 = 275
+            16 = 0
+            17 = 276
+            18 = 0
+            19 = 277
+            20 = 0
+            21 = 278
+            22 = 0
+            23 = 279
+            24 = 0
+            25 = 280
+            26 = 0
+            27 = 281
+            28 = 0
+            29 = 282
+            30 = 0
+        }
+    }
+    {
+        name = STRING_LITERAL
+        className = STRING_LITERAL
+        compressed = 1
+        regularGrammar = Selection(Sequence(CharacterClass('"'), End(1, <empty>)), Sequence(CharacterClass('[^\xa\xd]'), End(3, <empty>)))
+        positionToSet = {
+            0 = 283
+            1 = 0
+            2 = 284
+            3 = 0
+        }
+    }
+    {
+        name = COMMENT
+        className = COMMENT
+        compressed = 1
+        regularGrammar = Selection(Selection(Sequence(Sequence(CharacterClass('*'), CharacterClass('/')), End(2, <empty>)), Sequence(Sequence(Optional(CharacterClass('\xd')), CharacterClass('\xa')), End(5, <empty>))), Sequence(CharacterClass('[^\xa\xd]'), End(7, <empty>)))
+        positionToSet = {
+            0 = 285
+            1 = 286
+            2 = 0
+            3 = 287
+            4 = 288
+            5 = 0
+            6 = 289
+            7 = 0
+        }
+    }
+    {
+        name = SINGLE_LINE_COMMENT
+        className = SINGLE_LINE_COMMENT
+        compressed = 1
+        regularGrammar = Selection(Sequence(Sequence(Optional(CharacterClass('\xd')), CharacterClass('\xa')), End(2, <empty>)), Sequence(CharacterClass('[^\xa\xd]'), End(4, <empty>)))
+        positionToSet = {
+            0 = 290
+            1 = 291
+            2 = 0
+            3 = 292
+            4 = 0
+        }
+    }
+]
+columnMap = 01197240
+}
